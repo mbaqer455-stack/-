@@ -4,3 +4,7 @@ dist
 .DS_Store
 .vscode/*
 !.vscode/extensions.json
+
+# أسرار المشروع — لا تُرفع
+.env
+.env.local

@@ -5,21 +5,31 @@
    • الفيديوهات: رفع ملف أو إضافة رابط + حذف
    • الإعدادات: فتح/إغلاق الموقع + رسالة الإغلاق + رمز الدخول
 
-   تنبيه أمني: الدخول هنا بالرمز المحفوظ محليًا — للعرض فقط.
-   عند الربط بخادم حقيقي استبدله بمصادقة فعلية (JWT/Session) وتحقّق من الصلاحيات.
+   الدخول: في الوضع السحابي بحساب Supabase حقيقي (والصلاحيات محمية بـ RLS
+   على مستوى قاعدة البيانات، لا بإخفاء الواجهة). في الوضع المحلي برمز داخل
+   المتصفح — للتجربة فقط.
    ========================================================================== */
 
 import { createPortal } from 'react-dom';
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   api, exportColumns, exportCsv, formatBytes, formatDate, formatDateTime, formatDuration,
-  GENDER_LABEL, MEASURE_FIELDS, printPdf, useAdminSession, useSettings,
-  useSubmissions, useToasts, useVideos, type Submission,
+  GENDER_LABEL, isCloud, MEASURE_FIELDS, printPdf, useAdminSession, useSettings,
+  useSubmissions, useToasts, useVideos, type AdminSession, type Submission,
 } from '../lib';
 import {
-  Badge, Button, EmptyState, Field, Icons, Modal, Stat, Switch, TextArea, TextInput, Toasts,
-  useConfirm, type IconName,
+  Badge, Button, EmptyState, Field, Icons, Modal, Spinner, Stat, Switch, TextArea, TextInput,
+  Toasts, useConfirm, type IconName,
 } from '../ui';
+
+type Push = (text: string, tone?: 'ok' | 'error' | 'info') => void;
+
+/** ينفّذ عملية ويعرض نتيجتها كتنبيه — كل أخطاء الخادم تظهر بالعربية */
+const run = (task: Promise<unknown>, okMessage: string, push: Push): void => {
+  void task
+    .then(() => push(okMessage))
+    .catch((err: unknown) => push(err instanceof Error ? err.message : 'حدث خطأ غير متوقع', 'error'));
+};
 
 type Tab = 'overview' | 'data' | 'videos' | 'settings';
 
@@ -31,11 +41,11 @@ const TABS: { id: Tab; label: string; icon: IconName }[] = [
 ];
 
 export default function Admin() {
-  const { authed, login, logout } = useAdminSession();
+  const session = useAdminSession();
   const [tab, setTab] = useState<Tab>('overview');
   const { toasts, push } = useToasts();
 
-  if (!authed) return <Gate onLogin={login} />;
+  if (!session.authed) return <Gate session={session} />;
 
   return (
     <div className="shell flex flex-col gap-6 py-8">
@@ -48,10 +58,18 @@ export default function Admin() {
           </span>
           <div>
             <h1 className="text-xl">لوحة التحكم</h1>
-            <p className="text-[13px] text-ink-faint">إدارة القياسات والفيديوهات وحالة الموقع</p>
+            <p className="text-[13px] text-ink-faint">
+              {session.email || 'إدارة القياسات والفيديوهات وحالة الموقع'}
+            </p>
           </div>
         </div>
-        <Button variant="ghost" size="sm" icon="logout" onClick={logout}>خروج</Button>
+
+        <div className="flex items-center gap-2">
+          <Badge tone={isCloud ? 'mint' : 'neutral'} icon={isCloud ? 'link' : 'lock'}>
+            {isCloud ? 'مشترك' : 'محلي'}
+          </Badge>
+          <Button variant="ghost" size="sm" icon="logout" onClick={session.signOut}>خروج</Button>
+        </div>
       </header>
 
       {/* التبويبات */}
@@ -86,17 +104,37 @@ export default function Admin() {
 
 /* ------------------------------ بوابة الدخول ---------------------------- */
 
-function Gate({ onLogin }: { onLogin: (pin: string) => boolean }) {
+function Gate({ session }: { session: AdminSession }) {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [pin, setPin] = useState('');
   const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
 
-  const submit = (e: React.FormEvent) => {
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!onLogin(pin)) {
-      setError('رمز الدخول غير صحيح');
-      setPin('');
+    setError('');
+
+    if (!isCloud) {
+      if (!session.signInPin(pin)) { setError('رمز الدخول غير صحيح'); setPin(''); }
+      return;
     }
+
+    setBusy(true);
+    const message = await session.signIn(email, password);
+    setBusy(false);
+    if (message) { setError(message); setPassword(''); }
   };
+
+  // بانتظار التحقق من الجلسة المحفوظة
+  if (session.checking) {
+    return (
+      <div className="flex min-h-[70dvh] items-center justify-center gap-3 text-ink-faint">
+        <Spinner className="size-5" />
+        <span className="text-sm">جارٍ التحقق…</span>
+      </div>
+    );
+  }
 
   return (
     <div className="relative flex min-h-[70dvh] items-center justify-center px-5">
@@ -108,35 +146,62 @@ function Gate({ onLogin }: { onLogin: (pin: string) => boolean }) {
             <Icons.lock className="size-6" />
           </span>
           <h1 className="text-xl">لوحة التحكم</h1>
-          <p className="text-[13px] text-ink-dim">أدخل رمز الدخول للمتابعة</p>
+          <p className="text-[13px] text-ink-dim">
+            {isCloud ? 'سجّل الدخول بحساب المشرف' : 'أدخل رمز الدخول للمتابعة'}
+          </p>
         </div>
 
-        <Field label="رمز الدخول" error={error} hint="الرمز الافتراضي في هذا القالب: 1234">
-          {(id, invalid) => (
-            <TextInput
-              id={id}
-              type="password"
-              inputMode="numeric"
-              autoFocus
-              value={pin}
-              invalid={invalid}
-              placeholder="••••"
-              dir="ltr"
-              className="text-center text-lg tracking-[0.4em]"
-              onChange={(e) => { setPin(e.target.value); setError(''); }}
-            />
-          )}
-        </Field>
+        {isCloud ? (
+          <>
+            <Field label="البريد الإلكتروني">
+              {(id) => (
+                <TextInput
+                  id={id} type="email" autoComplete="email" autoFocus required
+                  value={email} dir="ltr" placeholder="you@example.com"
+                  onChange={(e) => { setEmail(e.target.value); setError(''); }}
+                />
+              )}
+            </Field>
 
-        <Button type="submit" icon="check" className="w-full">دخول</Button>
+            <Field label="كلمة المرور" error={error}>
+              {(id, invalid) => (
+                <TextInput
+                  id={id} type="password" autoComplete="current-password" required
+                  value={password} invalid={invalid} dir="ltr" placeholder="••••••••"
+                  onChange={(e) => { setPassword(e.target.value); setError(''); }}
+                />
+              )}
+            </Field>
+          </>
+        ) : (
+          <Field label="رمز الدخول" error={error} hint="الرمز الافتراضي في الوضع المحلي: 1234">
+            {(id, invalid) => (
+              <TextInput
+                id={id} type="password" inputMode="numeric" autoFocus
+                value={pin} invalid={invalid} placeholder="••••" dir="ltr"
+                className="text-center text-lg tracking-[0.4em]"
+                onChange={(e) => { setPin(e.target.value); setError(''); }}
+              />
+            )}
+          </Field>
+        )}
+
+        <Button type="submit" icon="check" loading={busy} className="w-full">
+          {busy ? 'جارٍ الدخول…' : 'دخول'}
+        </Button>
+
+        {isCloud && (
+          <p className="text-center text-[11px] leading-relaxed text-ink-faint">
+            الحسابات تُنشأ من لوحة Supabase ← Authentication ← Users.
+            لا يوجد تسجيل ذاتي.
+          </p>
+        )}
       </form>
     </div>
   );
 }
 
 /* ------------------------------- نظرة عامة ------------------------------ */
-
-type Push = (text: string, tone?: 'ok' | 'error' | 'info') => void;
 
 function Overview({ onGo, push }: { onGo: (t: Tab) => void; push: Push }) {
   const rows = useSubmissions();
@@ -175,7 +240,7 @@ function Overview({ onGo, push }: { onGo: (t: Tab) => void; push: Push }) {
             <Button
               variant="ghost"
               icon="plus"
-              onClick={() => { void api.seedDemo().then(() => push('تمت إضافة بيانات تجريبية')); }}
+              onClick={() => { run(api.seedDemo(), 'تمت إضافة بيانات تجريبية', push); }}
             >
               إضافة بيانات تجريبية
             </Button>
@@ -279,7 +344,7 @@ function DataPanel({ push }: { push: Push }) {
               size="sm"
               variant="outline"
               icon="plus"
-              onClick={() => { void api.seedDemo().then(() => push('تمت إضافة بيانات تجريبية')); }}
+              onClick={() => { run(api.seedDemo(), 'تمت إضافة بيانات تجريبية', push); }}
             >
               إضافة بيانات تجريبية
             </Button>
@@ -327,7 +392,7 @@ function DataPanel({ push }: { push: Push }) {
                           onClick={(e) => {
                             e.stopPropagation();
                             confirm(`سيتم حذف سجل «${r.fullName}» نهائيًا.`, () => {
-                              void api.deleteSubmission(r.id).then(() => push('تم حذف السجل'));
+                              run(api.deleteSubmission(r.id), 'تم حذف السجل', push);
                             });
                           }}
                         >
@@ -472,8 +537,8 @@ function VideosPanel({ push }: { push: Push }) {
       }
       reset();
       push('تم نشر الفيديو في الموقع');
-    } catch {
-      push('تعذّر حفظ الفيديو — قد تكون المساحة ممتلئة', 'error');
+    } catch (err) {
+      push(err instanceof Error ? err.message : 'تعذّر حفظ الفيديو', 'error');
     } finally {
       setBusy(false);
     }
@@ -599,7 +664,7 @@ function VideosPanel({ push }: { push: Push }) {
                   className="cursor-pointer rounded-lg p-2.5 text-ink-faint transition-colors hover:bg-rose/10 hover:text-rose"
                   onClick={() =>
                     confirm(`سيتم حذف «${v.title}» من الموقع نهائيًا.`, () => {
-                      void api.deleteVideo(v.id).then(() => push('تم حذف الفيديو'));
+                      run(api.deleteVideo(v.id), 'تم حذف الفيديو', push);
                     })
                   }
                 >
@@ -616,11 +681,25 @@ function VideosPanel({ push }: { push: Push }) {
 
 /* ------------------------------- الإعدادات ------------------------------ */
 
+
 function SettingsPanel({ push }: { push: Push }) {
   const settings = useSettings();
   const rows = useSubmissions();
   const { confirm, dialog } = useConfirm();
   const [pin, setPin] = useState(settings.pin);
+
+  // نسخة محلية من نصوص الإغلاق — تُحفظ عند مغادرة الحقل لا مع كل حرف
+  const [title, setTitle] = useState(settings.closedTitle);
+  const [message, setMessage] = useState(settings.closedMessage);
+
+  useEffect(() => { setTitle(settings.closedTitle); }, [settings.closedTitle]);
+  useEffect(() => { setMessage(settings.closedMessage); }, [settings.closedMessage]);
+
+  const saveText = (patch: { closedTitle?: string; closedMessage?: string }, current: string) => {
+    const next = patch.closedTitle ?? patch.closedMessage ?? '';
+    if (next.trim() === current.trim()) return;
+    run(api.updateSettings(patch), 'تم حفظ النص', push);
+  };
 
   return (
     <div className="flex flex-col gap-5">
@@ -641,12 +720,12 @@ function SettingsPanel({ push }: { push: Push }) {
         <Switch
           checked={settings.siteOpen}
           label={settings.siteOpen ? 'الموقع مفتوح — الطلاب يستطيعون الإدخال' : 'الموقع مغلق — تظهر رسالة الإغلاق'}
-          description="لوحة التحكم تبقى متاحة لك في الحالتين."
+          description={isCloud
+            ? 'يطبَّق على كل الأجهزة فورًا. لوحة التحكم تبقى متاحة لكم.'
+            : 'لوحة التحكم تبقى متاحة لك في الحالتين.'}
           onChange={(v) => {
-            const apply = () => {
-              void api.updateSettings({ siteOpen: v });
-              push(v ? 'تم فتح الموقع' : 'تم إغلاق الموقع', v ? 'ok' : 'info');
-            };
+            const apply = () =>
+              run(api.updateSettings({ siteOpen: v }), v ? 'تم فتح الموقع' : 'تم إغلاق الموقع', push);
             if (!v) confirm('سيتم منع الطلاب من إدخال القياسات حتى تعيد الفتح.', apply);
             else apply();
           }}
@@ -654,11 +733,13 @@ function SettingsPanel({ push }: { push: Push }) {
 
         <div className="divider-x" />
 
-        <Field label="عنوان رسالة الإغلاق">
+        <Field label="عنوان رسالة الإغلاق" hint="يُحفظ عند الخروج من الحقل">
           {(id) => (
             <TextInput
-              id={id} value={settings.closedTitle}
-              onChange={(e) => void api.updateSettings({ closedTitle: e.target.value })}
+              id={id}
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              onBlur={() => saveText({ closedTitle: title }, settings.closedTitle)}
             />
           )}
         </Field>
@@ -666,42 +747,64 @@ function SettingsPanel({ push }: { push: Push }) {
         <Field label="نص رسالة الإغلاق" hint="يظهر للزوار عندما يكون الموقع مغلقًا">
           {(id) => (
             <TextArea
-              id={id} value={settings.closedMessage}
-              onChange={(e) => void api.updateSettings({ closedMessage: e.target.value })}
+              id={id}
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+              onBlur={() => saveText({ closedMessage: message }, settings.closedMessage)}
             />
           )}
         </Field>
       </section>
 
-      {/* رمز الدخول */}
-      <section className="card flex flex-col gap-4 p-5">
-        <h2 className="flex items-center gap-2 text-base font-semibold">
-          <Icons.lock className="size-4 text-gold" />
-          رمز الدخول
-        </h2>
+      {/* الحساب / رمز الدخول */}
+      {isCloud ? (
+        <section className="card flex flex-col gap-3 p-5">
+          <h2 className="flex items-center gap-2 text-base font-semibold">
+            <Icons.users className="size-4 text-gold" />
+            حسابات المشرفين
+          </h2>
+          <p className="text-[13px] leading-relaxed text-ink-dim">
+            الدخول هنا بحساب حقيقي محمي من الخادم، وليس برمز داخل المتصفح.
+            لإضافة شريك أو تغيير كلمة مرور:
+          </p>
+          <ol className="flex list-inside list-decimal flex-col gap-1.5 text-[13px] text-ink-dim">
+            <li>افتح لوحة Supabase ← <span className="text-ink">Authentication</span> ← <span className="text-ink">Users</span></li>
+            <li>اضغط <span className="text-ink">Add user</span> وأدخل البريد وكلمة المرور</li>
+            <li>فعّل <span className="text-ink">Auto Confirm User</span> حتى يدخل مباشرة</li>
+          </ol>
+          <p className="text-[13px] text-ink-faint">
+            كل من له حساب يرى نفس البيانات ويستطيع إدارتها.
+          </p>
+        </section>
+      ) : (
+        <section className="card flex flex-col gap-4 p-5">
+          <h2 className="flex items-center gap-2 text-base font-semibold">
+            <Icons.lock className="size-4 text-gold" />
+            رمز الدخول
+          </h2>
 
-        <Field label="الرمز الحالي" hint="في القالب يُحفظ داخل المتصفح — استبدله بمصادقة الخادم عند الربط.">
-          {(id) => (
-            <div className="flex gap-2">
-              <TextInput
-                id={id} value={pin} dir="ltr" className="text-center tracking-[0.3em]"
-                onChange={(e) => setPin(e.target.value)}
-              />
-              <Button
-                variant="outline"
-                icon="check"
-                onClick={() => {
-                  if (pin.trim().length < 4) return push('الرمز يجب أن يكون 4 خانات على الأقل', 'error');
-                  void api.updateSettings({ pin: pin.trim() });
-                  push('تم تحديث رمز الدخول');
-                }}
-              >
-                حفظ
-              </Button>
-            </div>
-          )}
-        </Field>
-      </section>
+          <Field label="الرمز الحالي" hint="الوضع المحلي فقط — يُحفظ داخل هذا المتصفح.">
+            {(id) => (
+              <div className="flex gap-2">
+                <TextInput
+                  id={id} value={pin} dir="ltr" className="text-center tracking-[0.3em]"
+                  onChange={(e) => setPin(e.target.value)}
+                />
+                <Button
+                  variant="outline"
+                  icon="check"
+                  onClick={() => {
+                    if (pin.trim().length < 4) return push('الرمز يجب أن يكون 4 خانات على الأقل', 'error');
+                    run(api.updateSettings({ pin: pin.trim() }), 'تم تحديث رمز الدخول', push);
+                  }}
+                >
+                  حفظ
+                </Button>
+              </div>
+            )}
+          </Field>
+        </section>
+      )}
 
       {/* منطقة خطرة */}
       <section className="card flex flex-col gap-4 border-rose/25 p-5">
@@ -710,7 +813,7 @@ function SettingsPanel({ push }: { push: Push }) {
           منطقة الحذف
         </h2>
         <p className="text-[13px] text-ink-dim">
-          حذف جميع قياسات الطلاب ({rows.length} سجل). لا يمكن التراجع.
+          حذف جميع قياسات الطلاب ({rows.length} سجل){isCloud ? ' من قاعدة البيانات المشتركة' : ''}. لا يمكن التراجع.
         </p>
         <Button
           variant="danger"
@@ -718,7 +821,7 @@ function SettingsPanel({ push }: { push: Push }) {
           className="w-fit"
           onClick={() =>
             confirm('سيتم حذف كل سجلات القياسات نهائيًا. هل أنت متأكد؟', () => {
-              void api.clearSubmissions().then(() => push('تم حذف جميع السجلات', 'info'));
+              run(api.clearSubmissions(), 'تم حذف جميع السجلات', push);
             })
           }
         >

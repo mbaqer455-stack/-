@@ -66,9 +66,14 @@ export default function Measure() {
     }
 
     setSaving(true);
-    const row = await api.addSubmission(draft);
-    setSaving(false);
-    setDone(row);
+    try {
+      const row = await api.addSubmission(draft);
+      setDone(row);
+    } catch (err) {
+      push(err instanceof Error ? err.message : 'تعذّر إرسال القياس', 'error');
+    } finally {
+      setSaving(false);
+    }
   };
 
   if (done) return <SuccessView row={done} onAgain={() => { setDone(null); setDraft(EMPTY); setTouched({}); }} />;

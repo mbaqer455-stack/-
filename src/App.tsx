@@ -5,7 +5,7 @@
 
 import { lazy, Suspense, useEffect, useState } from 'react';
 import { NavLink, Route, Routes, useLocation } from 'react-router-dom';
-import { useSettings } from './lib';
+import { isCloud, useSettings, useSettingsReady } from './lib';
 import { Button, Icons, Spinner, type IconName } from './ui';
 import Home from './pages/Home';
 
@@ -22,9 +22,10 @@ const NAV: { to: string; label: string; icon: IconName }[] = [
 
 export default function App() {
   const settings = useSettings();
+  const settingsReady = useSettingsReady();
   const { pathname } = useLocation();
   const isAdmin = pathname.startsWith('/admin');
-  const locked = !settings.siteOpen && !isAdmin;
+  const locked = settingsReady && !settings.siteOpen && !isAdmin;
 
   // العودة لأعلى الصفحة عند تغيير المسار
   useEffect(() => { window.scrollTo({ top: 0, behavior: 'instant' as ScrollBehavior }); }, [pathname]);
@@ -34,7 +35,9 @@ export default function App() {
       <Header isAdmin={isAdmin} siteOpen={settings.siteOpen} />
 
       <main className="flex-1">
-        {locked ? (
+        {!settingsReady ? (
+          <PageLoader />
+        ) : locked ? (
           <ClosedScreen title={settings.closedTitle} message={settings.closedMessage} />
         ) : (
           <Suspense fallback={<PageLoader />}>
@@ -132,7 +135,7 @@ function Footer() {
           <span>قياس — منصة القياسات والفيديوهات</span>
         </div>
         <p className="text-xs text-ink-faint">
-          قالب واجهة جاهز للربط بالخادم · {new Date().getFullYear()}
+          {isCloud ? 'بيانات مشتركة لحظيًا' : 'وضع محلي — بيانات هذا الجهاز'} · {new Date().getFullYear()}
         </p>
       </div>
     </footer>

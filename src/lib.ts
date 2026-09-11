@@ -1,11 +1,20 @@
 /* ============================================================================
-   قياس — طبقة البيانات (قالب)
-   كل شيء هنا يعمل محليًا (localStorage + IndexedDB) حتى تربطه بالـ API.
-   للربط بالخادم: استبدل أجسام الدوال في قسم "API" بنداءات fetch فقط،
-   دون تغيير أي شيء في الواجهة.
+   قياس — طبقة البيانات
+
+   تعمل بوضعين تلقائيًا:
+   • سحابي (Supabase): عند وجود المفاتيح في .env — البيانات مشتركة بين الجميع،
+     والتحديث يصل لحظيًا لكل من يفتح الموقع.
+   • محلي (المتصفح): عند غياب المفاتيح — كل جهاز يحتفظ ببياناته وحده.
+     مفيد لتجربة القالب بسرعة بدون إعداد.
+
+   كل عمليات البيانات مجمّعة في كائن api في الأسفل.
    ========================================================================== */
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import type { RealtimeChannel } from '@supabase/supabase-js';
+import { isCloud, MEDIA_BUCKET, must, supabase } from './supabase';
+
+export { isCloud };
 
 /* ----------------------------------- الأنواع ---------------------------- */
 
@@ -38,7 +47,7 @@ export interface VideoItem {
   kind: 'file' | 'link';
   /** رابط خارجي عندما kind = link */
   url: string;
-  /** مفتاح الملف داخل IndexedDB عندما kind = file */
+  /** مسار الملف: داخل IndexedDB محليًا، أو داخل مخزن Supabase سحابيًا */
   blobKey: string;
   posterKey: string;
   size: number;
@@ -50,7 +59,7 @@ export interface Settings {
   siteOpen: boolean;
   closedTitle: string;
   closedMessage: string;
-  /** قالب فقط — المصادقة الحقيقية تتم في الخادم */
+  /** يُستخدم في الوضع المحلي فقط — في السحابي الدخول بحساب حقيقي */
   pin: string;
 }
 
@@ -84,7 +93,7 @@ export const DEFAULT_MEASURES: Record<MeasureKey, number> = {
 /* -------------------------------- أدوات عامة ---------------------------- */
 
 export const uid = (): string =>
-  `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+  `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 
 export const clamp = (v: number, min: number, max: number): number => Math.min(max, Math.max(min, v));
 
@@ -135,72 +144,192 @@ export function validateSubmission(v: Partial<Submission>): FormErrors {
   return e;
 }
 
-/* ------------------------- مخزن تفاعلي بسيط ----------------------------- */
+/* ========================================================================== */
+/*                              المخازن التفاعلية                             */
+/* ========================================================================== */
 
-interface Store<T> {
-  get: () => T;
-  set: (next: T | ((prev: T) => T)) => void;
-  subscribe: (cb: () => void) => () => void;
-}
+type Listener = () => void;
 
-function createStore<T>(key: string, initial: T): Store<T> {
-  let value: T = initial;
+function readLocal<T>(key: string, fallback: T): T {
   try {
     const raw = localStorage.getItem(key);
-    if (raw) {
-      const parsed = JSON.parse(raw) as unknown;
-      value = Array.isArray(initial) ? (parsed as T) : ({ ...initial, ...(parsed as object) } as T);
-    }
+    if (!raw) return fallback;
+    const parsed = JSON.parse(raw) as unknown;
+    return Array.isArray(fallback) ? (parsed as T) : ({ ...fallback, ...(parsed as object) } as T);
   } catch {
-    /* تخزين غير متاح — نكمل بالقيم الافتراضية */
+    return fallback;
   }
+}
 
-  const listeners = new Set<() => void>();
+function writeLocal(key: string, value: unknown): void {
+  try { localStorage.setItem(key, JSON.stringify(value)); } catch { /* ممتلئ أو محظور */ }
+}
+
+/* ------------------------------ مجموعة صفوف ----------------------------- */
+
+interface Collection<T> {
+  get: () => T[];
+  subscribe: (cb: Listener) => () => void;
+  reload: () => Promise<void>;
+  /** الوضع المحلي فقط */
+  setLocal: (next: (prev: T[]) => T[]) => void;
+}
+
+function createCollection<T extends { id: string }>(table: string, localKey: string): Collection<T> {
+  let value: T[] = isCloud ? [] : readLocal<T[]>(localKey, []);
+  const listeners = new Set<Listener>();
+  let channel: RealtimeChannel | null = null;
+
   const emit = () => listeners.forEach((l) => l());
 
-  // مزامنة بين تبويبات المتصفح
-  if (typeof window !== 'undefined') {
+  const reload = async (): Promise<void> => {
+    if (!isCloud || !supabase) return;
+    const { data, error } = await supabase
+      .from(table)
+      .select('*')
+      .order('createdAt', { ascending: false });
+
+    // خطأ الصلاحيات طبيعي للزائر (لا يقرأ بيانات الطلاب) — نتركها فارغة
+    if (error) return;
+    value = (data ?? []) as T[];
+    emit();
+  };
+
+  // مزامنة بين تبويبات المتصفح في الوضع المحلي
+  if (!isCloud && typeof window !== 'undefined') {
     window.addEventListener('storage', (ev) => {
-      if (ev.key !== key || ev.newValue == null) return;
-      try {
-        value = JSON.parse(ev.newValue) as T;
-        emit();
-      } catch { /* تجاهل */ }
+      if (ev.key !== localKey || ev.newValue == null) return;
+      try { value = JSON.parse(ev.newValue) as T[]; emit(); } catch { /* تجاهل */ }
     });
   }
 
   return {
     get: () => value,
-    set: (next) => {
-      value = typeof next === 'function' ? (next as (p: T) => T)(value) : next;
-      try { localStorage.setItem(key, JSON.stringify(value)); } catch { /* ممتلئ */ }
+    reload,
+    setLocal: (next) => {
+      value = next(value);
+      writeLocal(localKey, value);
       emit();
     },
     subscribe: (cb) => {
       listeners.add(cb);
-      return () => { listeners.delete(cb); };
+
+      // أول مشترك: نحمّل البيانات ونفتح قناة التحديث اللحظي
+      if (listeners.size === 1 && isCloud && supabase) {
+        void reload();
+        channel = supabase
+          .channel(`qias:${table}`)
+          .on('postgres_changes', { event: '*', schema: 'public', table }, () => { void reload(); })
+          .subscribe();
+      }
+
+      return () => {
+        listeners.delete(cb);
+        if (listeners.size === 0 && channel && supabase) {
+          void supabase.removeChannel(channel);
+          channel = null;
+        }
+      };
     },
   };
 }
 
-const submissionsStore = createStore<Submission[]>('qias.submissions', []);
-const videosStore = createStore<VideoItem[]>('qias.videos', []);
-const settingsStore = createStore<Settings>('qias.settings', {
+const submissions = createCollection<Submission>('submissions', 'qias.submissions');
+const videos = createCollection<VideoItem>('videos', 'qias.videos');
+
+/* -------------------------------- الإعدادات ----------------------------- */
+
+const DEFAULT_SETTINGS: Settings = {
   siteOpen: true,
   closedTitle: 'الموقع مغلق مؤقتًا',
   closedMessage: 'تم إيقاف استقبال القياسات حاليًا. يرجى المحاولة لاحقًا أو مراجعة الإدارة.',
   pin: '1234',
-});
+};
 
-function useStore<T>(store: Store<T>): T {
-  return useSyncExternalStore(store.subscribe, store.get, store.get);
-}
+const SETTINGS_KEY = 'qias.settings';
 
-export const useSubmissions = (): Submission[] => useStore(submissionsStore);
-export const useVideos = (): VideoItem[] => useStore(videosStore);
-export const useSettings = (): Settings => useStore(settingsStore);
+const settingsStore = (() => {
+  let value: Settings = isCloud ? DEFAULT_SETTINGS : readLocal(SETTINGS_KEY, DEFAULT_SETTINGS);
+  let ready = !isCloud;
+  const listeners = new Set<Listener>();
+  let channel: RealtimeChannel | null = null;
 
-/* ------------------------- IndexedDB لملفات الفيديو --------------------- */
+  const emit = () => listeners.forEach((l) => l());
+
+  const reload = async (): Promise<void> => {
+    if (!isCloud || !supabase) return;
+    const { data, error } = await supabase.from('settings').select('*').eq('id', 1).single();
+    if (!error && data) {
+      value = {
+        siteOpen: Boolean(data.siteOpen),
+        closedTitle: String(data.closedTitle ?? DEFAULT_SETTINGS.closedTitle),
+        closedMessage: String(data.closedMessage ?? DEFAULT_SETTINGS.closedMessage),
+        pin: '',
+      };
+    }
+    ready = true;
+    emit();
+  };
+
+  if (!isCloud && typeof window !== 'undefined') {
+    window.addEventListener('storage', (ev) => {
+      if (ev.key !== SETTINGS_KEY || ev.newValue == null) return;
+      try { value = JSON.parse(ev.newValue) as Settings; emit(); } catch { /* تجاهل */ }
+    });
+  }
+
+  return {
+    get: () => value,
+    isReady: () => ready,
+    reload,
+    setLocal: (patch: Partial<Settings>) => {
+      value = { ...value, ...patch };
+      writeLocal(SETTINGS_KEY, value);
+      emit();
+    },
+    /** تحديث متفائل: نعرض التغيير فورًا ثم نرسله للخادم */
+    setOptimistic: (patch: Partial<Settings>) => {
+      value = { ...value, ...patch };
+      emit();
+    },
+    subscribe: (cb: Listener) => {
+      listeners.add(cb);
+      if (listeners.size === 1 && isCloud && supabase) {
+        void reload();
+        channel = supabase
+          .channel('qias:settings')
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'settings' }, () => { void reload(); })
+          .subscribe();
+      }
+      return () => {
+        listeners.delete(cb);
+        if (listeners.size === 0 && channel && supabase) {
+          void supabase.removeChannel(channel);
+          channel = null;
+        }
+      };
+    },
+  };
+})();
+
+/* ------------------------------- الـ hooks ------------------------------ */
+
+export const useSubmissions = (): Submission[] =>
+  useSyncExternalStore(submissions.subscribe, submissions.get, submissions.get);
+
+export const useVideos = (): VideoItem[] =>
+  useSyncExternalStore(videos.subscribe, videos.get, videos.get);
+
+export const useSettings = (): Settings =>
+  useSyncExternalStore(settingsStore.subscribe, settingsStore.get, settingsStore.get);
+
+/** هل وصلت الإعدادات من الخادم؟ نتجنب وميض «الموقع مفتوح» قبل معرفة الحقيقة */
+export const useSettingsReady = (): boolean =>
+  useSyncExternalStore(settingsStore.subscribe, settingsStore.isReady, settingsStore.isReady);
+
+/* ========================================================================== */
+/*                        تخزين الملفات (فيديو + صورة)                        */
+/* ========================================================================== */
 
 const DB_NAME = 'qias-media';
 const DB_STORE = 'files';
@@ -250,11 +379,17 @@ async function idbDelete(key: string): Promise<void> {
   db.close();
 }
 
-/** روابط blob مؤقتة — تُنشأ مرة واحدة لكل مفتاح وتُحرَّر عند الحذف */
+/** روابط blob المحلية — تُنشأ مرة واحدة لكل مفتاح */
 const objectUrls = new Map<string, string>();
 
+/** يحوّل مفتاح ملف إلى رابط قابل للتشغيل (سحابي أو محلي) */
 export async function mediaUrl(key: string): Promise<string> {
   if (!key) return '';
+
+  if (isCloud && supabase) {
+    return supabase.storage.from(MEDIA_BUCKET).getPublicUrl(key).data.publicUrl;
+  }
+
   const cached = objectUrls.get(key);
   if (cached) return cached;
   const blob = await idbGet(key);
@@ -272,7 +407,7 @@ function revokeMedia(key: string): void {
   }
 }
 
-/** hook: يعطي رابط تشغيل جاهز لأي فيديو (ملف محلي أو رابط خارجي) */
+/** hook: رابط تشغيل جاهز لأي فيديو (ملف مرفوع أو رابط خارجي) */
 export function useVideoSource(video: VideoItem | null): string {
   const [src, setSrc] = useState('');
   useEffect(() => {
@@ -285,48 +420,105 @@ export function useVideoSource(video: VideoItem | null): string {
   return src;
 }
 
-/* ---------------------------------- API --------------------------------- */
-/* استبدل محتوى هذه الدوال بنداءات الخادم عند الربط الحقيقي */
+/* ========================================================================== */
+/*                                    API                                     */
+/* ========================================================================== */
+
+/** يحوّل خطأ Supabase إلى رسالة عربية مفهومة */
+function fail(action: string, error: { message: string } | null): never {
+  const detail = error?.message ?? '';
+  if (/row-level security|permission/i.test(detail)) {
+    throw new Error(`${action}: ليس لديك صلاحية — سجّل الدخول أولًا`);
+  }
+  if (/Failed to fetch|NetworkError/i.test(detail)) {
+    throw new Error(`${action}: تعذّر الاتصال بالخادم — تحقق من الإنترنت`);
+  }
+  throw new Error(`${action}: ${detail || 'خطأ غير متوقع'}`);
+}
 
 export const api = {
-  /* --- القياسات --- */
+  /* ------------------------------ القياسات ------------------------------ */
+
   async addSubmission(data: Omit<Submission, 'id' | 'createdAt'>): Promise<Submission> {
     const row: Submission = { ...data, id: uid(), createdAt: Date.now() };
-    submissionsStore.set((prev) => [row, ...prev]);
+
+    if (isCloud) {
+      const { error } = await must(supabase).from('submissions').insert(row);
+      if (error) fail('تعذّر إرسال القياس', error);
+    } else {
+      submissions.setLocal((prev) => [row, ...prev]);
+    }
     return row;
   },
 
   async deleteSubmission(id: string): Promise<void> {
-    submissionsStore.set((prev) => prev.filter((s) => s.id !== id));
+    if (isCloud) {
+      const { error } = await must(supabase).from('submissions').delete().eq('id', id);
+      if (error) fail('تعذّر حذف السجل', error);
+      await submissions.reload();
+    } else {
+      submissions.setLocal((prev) => prev.filter((s) => s.id !== id));
+    }
   },
 
   async clearSubmissions(): Promise<void> {
-    submissionsStore.set([]);
+    if (isCloud) {
+      const { error } = await must(supabase).from('submissions').delete().neq('id', '');
+      if (error) fail('تعذّر حذف السجلات', error);
+      await submissions.reload();
+    } else {
+      submissions.setLocal(() => []);
+    }
   },
 
-  /* --- الفيديوهات --- */
-  async addVideoFile(file: File, meta: { title: string; description: string }): Promise<VideoItem> {
-    const blobKey = `v_${uid()}`;
-    await idbPut(blobKey, file);
+  /* ----------------------------- الفيديوهات ----------------------------- */
 
-    let duration = 0;
+  async addVideoFile(file: File, meta: { title: string; description: string }): Promise<VideoItem> {
+    const id = uid();
+    const ext = file.name.split('.').pop()?.toLowerCase() || 'mp4';
+    const blobKey = `videos/${id}.${ext}`;
     let posterKey = '';
+    let duration = 0;
+
+    // لقطة مصغّرة من الفيديو نفسه (اختيارية — لا توقف الرفع إن فشلت)
+    let poster: Blob | null = null;
     try {
       const shot = await captureFrame(file);
       duration = shot.duration;
-      if (shot.poster) {
-        posterKey = `p_${uid()}`;
-        await idbPut(posterKey, shot.poster);
+      poster = shot.poster;
+      if (poster) posterKey = `posters/${id}.jpg`;
+    } catch { /* نكمل بدون صورة */ }
+
+    if (isCloud) {
+      const client = must(supabase);
+      const up = await client.storage.from(MEDIA_BUCKET)
+        .upload(blobKey, file, { contentType: file.type || 'video/mp4', upsert: false });
+      if (up.error) fail('تعذّر رفع الفيديو', up.error);
+
+      if (poster && posterKey) {
+        const shot = await client.storage.from(MEDIA_BUCKET)
+          .upload(posterKey, poster, { contentType: 'image/jpeg', upsert: false });
+        if (shot.error) posterKey = '';
       }
-    } catch { /* الصورة المصغّرة اختيارية */ }
+    } else {
+      await idbPut(blobKey, file);
+      if (poster && posterKey) await idbPut(posterKey, poster);
+    }
 
     const row: VideoItem = {
-      id: uid(), createdAt: Date.now(), kind: 'file', url: '',
+      id, createdAt: Date.now(), kind: 'file', url: '',
       title: meta.title.trim() || file.name,
       description: meta.description.trim(),
       blobKey, posterKey, size: file.size, mime: file.type, duration,
     };
-    videosStore.set((prev) => [row, ...prev]);
+
+    if (isCloud) {
+      const { error } = await must(supabase).from('videos').insert(row);
+      if (error) fail('تعذّر حفظ بيانات الفيديو', error);
+      await videos.reload();
+    } else {
+      videos.setLocal((prev) => [row, ...prev]);
+    }
     return row;
   },
 
@@ -336,27 +528,58 @@ export const api = {
       url: meta.url.trim(), title: meta.title.trim(), description: meta.description.trim(),
       blobKey: '', posterKey: '', size: 0, mime: '', duration: 0,
     };
-    videosStore.set((prev) => [row, ...prev]);
+
+    if (isCloud) {
+      const { error } = await must(supabase).from('videos').insert(row);
+      if (error) fail('تعذّر إضافة الرابط', error);
+      await videos.reload();
+    } else {
+      videos.setLocal((prev) => [row, ...prev]);
+    }
     return row;
   },
 
   async deleteVideo(id: string): Promise<void> {
-    const item = videosStore.get().find((v) => v.id === id);
-    if (item?.blobKey) { revokeMedia(item.blobKey); await idbDelete(item.blobKey); }
-    if (item?.posterKey) { revokeMedia(item.posterKey); await idbDelete(item.posterKey); }
-    videosStore.set((prev) => prev.filter((v) => v.id !== id));
+    const item = videos.get().find((v) => v.id === id);
+    const keys = [item?.blobKey, item?.posterKey].filter(Boolean) as string[];
+
+    if (isCloud) {
+      const client = must(supabase);
+      if (keys.length) await client.storage.from(MEDIA_BUCKET).remove(keys);
+      const { error } = await client.from('videos').delete().eq('id', id);
+      if (error) fail('تعذّر حذف الفيديو', error);
+      await videos.reload();
+    } else {
+      for (const k of keys) { revokeMedia(k); await idbDelete(k); }
+      videos.setLocal((prev) => prev.filter((v) => v.id !== id));
+    }
   },
 
-  /* --- الإعدادات --- */
+  /* ------------------------------ الإعدادات ----------------------------- */
+
   async updateSettings(patch: Partial<Settings>): Promise<void> {
-    settingsStore.set((prev) => ({ ...prev, ...patch }));
+    if (isCloud) {
+      // pin غير موجود في قاعدة البيانات — الدخول بحساب حقيقي
+      const { pin: _pin, ...remote } = patch;
+      if (Object.keys(remote).length === 0) return;
+
+      settingsStore.setOptimistic(remote);
+      const { error } = await must(supabase).from('settings').update(remote).eq('id', 1);
+      if (error) {
+        await settingsStore.reload(); // نتراجع عن التحديث المتفائل
+        fail('تعذّر حفظ الإعداد', error);
+      }
+    } else {
+      settingsStore.setLocal(patch);
+    }
   },
 
   getSettings(): Settings {
     return settingsStore.get();
   },
 
-  /* --- بيانات تجريبية للمعاينة --- */
+  /* ------------------------- بيانات تجريبية ----------------------------- */
+
   async seedDemo(): Promise<void> {
     const names = [
       'محمد باقر حسن', 'زينب علي كريم', 'أحمد صباح جاسم', 'فاطمة نور الدين',
@@ -385,7 +608,14 @@ export const api = {
         notes: i % 4 === 0 ? 'يفضّل قياسًا أوسع قليلًا عند الكتف' : '',
       };
     });
-    submissionsStore.set((prev) => [...rows, ...prev]);
+
+    if (isCloud) {
+      const { error } = await must(supabase).from('submissions').insert(rows);
+      if (error) fail('تعذّر إضافة البيانات التجريبية', error);
+      await submissions.reload();
+    } else {
+      submissions.setLocal((prev) => [...rows, ...prev]);
+    }
   },
 };
 
@@ -400,8 +630,8 @@ function captureFrame(file: File): Promise<{ poster: Blob | null; duration: numb
     video.playsInline = true;
     video.src = url;
 
-    const fail = (err: unknown) => { URL.revokeObjectURL(url); reject(err); };
-    const timer = setTimeout(() => fail(new Error('timeout')), 8000);
+    const fail2 = (err: unknown) => { URL.revokeObjectURL(url); reject(err); };
+    const timer = setTimeout(() => fail2(new Error('timeout')), 8000);
 
     video.onloadedmetadata = () => { video.currentTime = Math.min(1, (video.duration || 0) * 0.1); };
     video.onseeked = () => {
@@ -417,7 +647,7 @@ function captureFrame(file: File): Promise<{ poster: Blob | null; duration: numb
         resolve({ poster, duration });
       }, 'image/jpeg', 0.72);
     };
-    video.onerror = () => { clearTimeout(timer); fail(new Error('video decode failed')); };
+    video.onerror = () => { clearTimeout(timer); fail2(new Error('video decode failed')); };
   });
 }
 
@@ -470,7 +700,6 @@ export function printPdf(): void {
     window.removeEventListener('afterprint', cleanup);
   };
   window.addEventListener('afterprint', cleanup);
-  // مهلة قصيرة حتى يُرسم تقرير الطباعة قبل فتح النافذة
   setTimeout(() => { window.print(); setTimeout(cleanup, 800); }, 120);
 }
 
@@ -525,27 +754,80 @@ export function useToasts() {
   const push = useCallback((text: string, tone: Toast['tone'] = 'ok') => {
     const id = uid();
     setToasts((t) => [...t, { id, text, tone }]);
-    setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 3400);
+    setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 4000);
   }, []);
   return { toasts, push };
 }
 
-/** جلسة لوحة التحكم (قالب — تُستبدل بتوكن حقيقي من الخادم) */
-const SESSION_KEY = 'qias.admin';
+/* ------------------------------ جلسة المشرف ----------------------------- */
 
-export function useAdminSession() {
-  const [authed, setAuthed] = useState(() => sessionStorage.getItem(SESSION_KEY) === '1');
-  const login = useCallback((pin: string) => {
-    if (pin === api.getSettings().pin) {
-      sessionStorage.setItem(SESSION_KEY, '1');
-      setAuthed(true);
-      return true;
+const LOCAL_SESSION_KEY = 'qias.admin';
+
+export interface AdminSession {
+  authed: boolean;
+  /** أثناء التحقق من الجلسة المحفوظة عند فتح الصفحة */
+  checking: boolean;
+  /** بريد المشرف الحالي في الوضع السحابي */
+  email: string;
+  /** الوضع السحابي: دخول ببريد وكلمة مرور. يرجع رسالة الخطأ أو null عند النجاح */
+  signIn: (email: string, password: string) => Promise<string | null>;
+  /** الوضع المحلي: دخول برمز */
+  signInPin: (pin: string) => boolean;
+  signOut: () => void;
+}
+
+export function useAdminSession(): AdminSession {
+  const [authed, setAuthed] = useState(() =>
+    isCloud ? false : sessionStorage.getItem(LOCAL_SESSION_KEY) === '1');
+  const [checking, setChecking] = useState(isCloud);
+  const [email, setEmail] = useState('');
+
+  useEffect(() => {
+    if (!isCloud || !supabase) return;
+    let alive = true;
+
+    void supabase.auth.getSession().then(({ data }) => {
+      if (!alive) return;
+      setAuthed(Boolean(data.session));
+      setEmail(data.session?.user.email ?? '');
+      setChecking(false);
+    });
+
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+      setAuthed(Boolean(session));
+      setEmail(session?.user.email ?? '');
+      setChecking(false);
+    });
+
+    return () => { alive = false; sub.subscription.unsubscribe(); };
+  }, []);
+
+  const signIn = useCallback(async (mail: string, password: string): Promise<string | null> => {
+    if (!supabase) return 'الموقع غير مربوط بقاعدة البيانات';
+    const { error } = await supabase.auth.signInWithPassword({ email: mail.trim(), password });
+    if (!error) return null;
+    if (/Invalid login credentials/i.test(error.message)) return 'البريد أو كلمة المرور غير صحيحة';
+    if (/Email not confirmed/i.test(error.message)) return 'الحساب غير مفعّل — فعّله من لوحة Supabase';
+    if (/Failed to fetch/i.test(error.message)) return 'تعذّر الاتصال — تحقق من الإنترنت';
+    return error.message;
+  }, []);
+
+  const signInPin = useCallback((pin: string): boolean => {
+    if (pin !== settingsStore.get().pin) return false;
+    sessionStorage.setItem(LOCAL_SESSION_KEY, '1');
+    setAuthed(true);
+    return true;
+  }, []);
+
+  const signOut = useCallback(() => {
+    if (isCloud && supabase) {
+      void supabase.auth.signOut();
+    } else {
+      sessionStorage.removeItem(LOCAL_SESSION_KEY);
     }
-    return false;
-  }, []);
-  const logout = useCallback(() => {
-    sessionStorage.removeItem(SESSION_KEY);
     setAuthed(false);
+    setEmail('');
   }, []);
-  return { authed, login, logout };
+
+  return { authed, checking, email, signIn, signInPin, signOut };
 }

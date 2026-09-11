@@ -5,7 +5,7 @@
 
 import { lazy, Suspense } from 'react';
 import { Link } from 'react-router-dom';
-import { MEASURE_FIELDS, useInView, useReveal, useSettings, useSubmissions, useVideos } from '../lib';
+import { MEASURE_FIELDS, useInView, useReveal, useSettings, useVideos } from '../lib';
 import { Badge, Button, Icons, SectionHead } from '../ui';
 
 const HeroScene = lazy(() =>
@@ -14,12 +14,11 @@ const HeroScene = lazy(() =>
 
 export default function Home() {
   const videos = useVideos();
-  const submissions = useSubmissions();
   const settings = useSettings();
 
   return (
     <div className="flex flex-col">
-      <Hero open={settings.siteOpen} count={submissions.length} />
+      <Hero open={settings.siteOpen} videoCount={videos.length} />
       <Steps />
       <Measurements />
       <VideosTeaser count={videos.length} />
@@ -30,7 +29,7 @@ export default function Home() {
 
 /* --------------------------------- البطل -------------------------------- */
 
-function Hero({ open, count }: { open: boolean; count: number }) {
+function Hero({ open, videoCount }: { open: boolean; videoCount: number }) {
   const { ref, inView } = useInView<HTMLDivElement>('200px');
 
   return (
@@ -83,9 +82,9 @@ function Hero({ open, count }: { open: boolean; count: number }) {
       </div>
 
       <div className="shell flex items-center justify-center gap-6 text-center">
-        <MiniStat value={String(count)} label="قياس مُسجّل" />
-        <span className="h-8 w-px bg-line" />
         <MiniStat value="٦" label="حقول قياس" />
+        <span className="h-8 w-px bg-line" />
+        <MiniStat value={String(videoCount)} label="فيديو منشور" />
         <span className="h-8 w-px bg-line" />
         <MiniStat value="3D" label="معاينة فورية" />
       </div>
