@@ -124,13 +124,16 @@ type Size = 'sm' | 'md' | 'lg';
 
 const VARIANTS: Record<Variant, string> = {
   primary:
-    'bg-gold text-on-gold hover:bg-gold-soft shadow-[0_10px_30px_-12px_rgb(224_177_92/0.7)] font-semibold',
+    'relative liquid liquid-sheen font-semibold text-on-brand border border-white/25 ' +
+    'bg-gradient-to-b from-brand-vivid to-brand ' +
+    'shadow-[inset_0_1px_0_0_rgb(255_255_255/0.35),0_10px_26px_-10px_rgb(10_10_11/0.4)] ' +
+    'hover:shadow-[inset_0_1px_0_0_rgb(255_255_255/0.5),0_14px_32px_-10px_rgb(10_10_11/0.5)]',
   outline:
-    'border border-line bg-surface/60 text-ink hover:border-gold/50 hover:bg-surface-2',
+    'relative liquid liquid-sheen glass text-ink hover:border-brand-soft',
   ghost:
-    'text-ink-dim hover:text-ink hover:bg-surface-2',
+    'liquid text-ink-dim hover:text-brand hover:bg-brand-tint/70',
   danger:
-    'border border-rose/35 bg-rose/10 text-rose hover:bg-rose/20',
+    'liquid border border-rose/25 bg-rose/8 text-rose hover:bg-rose/15 backdrop-blur-md',
 };
 
 const SIZES: Record<Size, string> = {
@@ -154,7 +157,7 @@ export function Button({
     <button
       className={`inline-flex cursor-pointer select-none items-center justify-center whitespace-nowrap
         transition-[transform,background-color,border-color,color,box-shadow] duration-200
-        active:scale-[0.975] disabled:pointer-events-none disabled:opacity-50
+        disabled:pointer-events-none disabled:opacity-50
         ${VARIANTS[variant]} ${SIZES[size]} ${className}`}
       disabled={disabled || loading}
       {...rest}
@@ -198,7 +201,7 @@ export function Field({ label, hint, error, suffix, required, group, children }:
         className="flex items-center gap-1.5 text-sm font-medium text-ink"
       >
         {label}
-        {required && <span className="text-gold" aria-hidden="true">*</span>}
+        {required && <span className="text-brand" aria-hidden="true">*</span>}
       </Label>
 
       <div className="relative">
@@ -224,7 +227,7 @@ export function Field({ label, hint, error, suffix, required, group, children }:
 
 const inputBase = `w-full rounded-xl border bg-surface-2/70 px-3.5 text-ink placeholder:text-ink-faint/70
   transition-colors duration-200 outline-none
-  focus:border-gold/70 focus:bg-surface-2 focus:ring-2 focus:ring-gold/20`;
+  focus:border-brand/70 focus:bg-surface-2 focus:ring-2 focus:ring-brand/20`;
 
 export function TextInput({
   invalid, className = '', ...rest
@@ -291,7 +294,7 @@ export function ChoiceGroup<T extends string>({ value, onChange, options, name }
             className={`flex h-12 cursor-pointer items-center justify-center gap-2 rounded-xl border text-sm
               transition-all duration-200
               ${active
-                ? 'border-gold/70 bg-gold/12 font-semibold text-gold'
+                ? 'border-brand/70 bg-brand/12 font-semibold text-brand'
                 : 'border-line bg-surface-2/60 text-ink-dim hover:border-line hover:bg-surface-2 hover:text-ink'}`}
           >
             {Icon && <Icon className="size-4" />}
@@ -342,13 +345,12 @@ export function Switch({ checked, onChange, label, description }: SwitchProps) {
 
 export function Badge({
   children, tone = 'neutral', icon,
-}: { children: ReactNode; tone?: 'neutral' | 'gold' | 'mint' | 'rose' | 'sky'; icon?: IconName }) {
+}: { children: ReactNode; tone?: 'neutral' | 'brand' | 'mint' | 'rose'; icon?: IconName }) {
   const tones = {
     neutral: 'border-line bg-surface-2 text-ink-dim',
-    gold: 'border-gold/30 bg-gold/10 text-gold',
+    brand: 'border-brand/30 bg-brand/10 text-brand',
     mint: 'border-mint/30 bg-mint/10 text-mint',
     rose: 'border-rose/30 bg-rose/10 text-rose',
-    sky: 'border-sky/30 bg-sky/10 text-sky',
   };
   const Icon = icon ? Icons[icon] : null;
   return (
@@ -427,7 +429,7 @@ export function Toasts({ items }: { items: Toast[] }) {
   const tones = {
     ok: 'border-mint/35 text-mint',
     error: 'border-rose/35 text-rose',
-    info: 'border-sky/35 text-sky',
+    info: 'border-brand/35 text-brand',
   };
   return createPortal(
     <div className="pointer-events-none fixed inset-x-0 bottom-5 z-200 flex flex-col items-center gap-2 px-4">
@@ -455,7 +457,7 @@ export function SectionHead({
   return (
     <div className={`flex flex-col gap-3 ${center ? 'items-center text-center' : ''}`}>
       {eyebrow && (
-        <span className="inline-flex w-fit items-center gap-2 rounded-pill border border-gold/25 bg-gold/8 px-3 py-1 text-xs font-medium tracking-wide text-gold">
+        <span className="inline-flex w-fit items-center gap-2 rounded-pill border border-brand/25 bg-brand/8 px-3 py-1 text-xs font-medium tracking-wide text-brand">
           <Icons.sparkle className="size-3.5" />
           {eyebrow}
         </span>
@@ -483,13 +485,12 @@ export function EmptyState({
 }
 
 export function Stat({
-  icon, label, value, sub, tone = 'gold',
-}: { icon: IconName; label: string; value: string; sub?: string; tone?: 'gold' | 'mint' | 'sky' | 'rose' }) {
+  icon, label, value, sub, tone = 'brand',
+}: { icon: IconName; label: string; value: string; sub?: string; tone?: 'brand' | 'mint' | 'rose' }) {
   const Icon = Icons[icon];
   const tones = {
-    gold: 'text-gold bg-gold/10 border-gold/20',
+    brand: 'text-brand bg-brand/10 border-brand/20',
     mint: 'text-mint bg-mint/10 border-mint/20',
-    sky: 'text-sky bg-sky/10 border-sky/20',
     rose: 'text-rose bg-rose/10 border-rose/20',
   };
   return (

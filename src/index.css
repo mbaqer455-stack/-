@@ -1,69 +1,87 @@
 @import "tailwindcss";
 
 /* ===========================================================
-   قياس — Design System (Dark-first, Arabic RTL)
-   Style: Modern Dark / Cinematic  ·  Accent: Gold
+   قياس — نظام التصميم
+   الألوان : أبيض وأسود (رمادي محايد بالكامل)
+   الاتجاه : عربي RTL
    =========================================================== */
 @theme {
-  /* Surfaces */
-  --color-bg: #0a0c10;
-  --color-surface: #11141b;
-  --color-surface-2: #171b24;
-  --color-line: #262b36;
+  /* ---- الأسطح ---- */
+  --color-bg: #f6f6f7;          /* خلفية الصفحة */
+  --color-bg-2: #eaeaec;        /* تدرّج سفلي خفيف */
+  --color-surface: #ffffff;     /* البطاقات */
+  --color-surface-2: #f2f2f4;   /* سطح ثانوي */
+  --color-line: #e3e3e6;        /* الحدود */
+  --color-line-soft: #eeeef0;   /* حدود خافتة */
 
-  /* Text */
-  --color-ink: #f4f1ea;
-  --color-ink-dim: #a6adbb;
-  --color-ink-faint: #79828f;
+  /* ---- النص (كلها ≥ 4.5:1 على الأبيض) ---- */
+  --color-ink: #33333a;         /* 11.2:1 — أسود مخفّف لا فحمي */
+  --color-ink-dim: #5c5c63;     /* 7.0:1  */
+  --color-ink-faint: #7b7b82;   /* 4.7:1  */
 
-  /* Brand */
-  --color-gold: #e0b15c;
-  --color-gold-soft: #f0d49b;
-  --color-gold-deep: #a97a2e;
-  --color-on-gold: #150f05;
+  /* ---- الهوية: رمادي متوسط ---- */
+  --color-brand: #63636b;       /* 6.4:1 — والأبيض فوقه 6.4:1 أيضًا */
+  --color-brand-vivid: #7b7b84; /* درجة أفتح للتدرّجات */
+  --color-brand-soft: #c4c4c9;  /* لمسات فاتحة */
+  --color-brand-tint: #f0f0f2;  /* خلفيات خفيفة */
+  --color-on-brand: #ffffff;
 
-  /* Semantic */
-  --color-mint: #55d6a8;
-  --color-sky: #6aa8ff;
-  --color-rose: #f2637a;
+  /* ---- دلالية — مكتومة لتبقى ضمن الأبيض والأسود ---- */
+  --color-mint: #2f4f3a;
+  --color-rose: #6e1f24;
+  --color-amber: #5c4a20;
 
-  /* Type */
+  /* ---- الخطوط ---- */
   --font-sans: "Noto Sans Arabic", "Segoe UI", Tahoma, system-ui, sans-serif;
   --font-display: "Noto Kufi Arabic", "Noto Sans Arabic", "Segoe UI", Tahoma, sans-serif;
 
-  /* Radii */
-  --radius-card: 1.25rem;
+  /* ---- الأنصاف الأقطار ---- */
+  --radius-card: 1.5rem;
   --radius-pill: 999px;
 
-  /* Motion */
+  /* ---- الحركة ---- */
   --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);  /* ارتداد iOS */
 }
 
 @layer base {
   :root {
-    color-scheme: dark;
-    --header-h: 4rem;
+    color-scheme: light;
+    --glass-blur: 22px;
+    --glass-sat: 140%;
   }
 
-  * {
-    border-color: var(--color-line);
-  }
+  * { border-color: var(--color-line); }
 
   html {
     scroll-behavior: smooth;
-    scroll-padding-top: calc(var(--header-h) + 1rem);
+    scroll-padding-top: 1rem;
     -webkit-text-size-adjust: 100%;
   }
 
   body {
     margin: 0;
-    background: var(--color-bg);
     color: var(--color-ink);
     font-family: var(--font-sans);
     font-size: 16px;
     line-height: 1.65;
     -webkit-font-smoothing: antialiased;
     overflow-x: hidden;
+
+    background: var(--color-bg);
+  }
+
+  /* الخلفية المتدرّجة كطبقة ثابتة مستقلة بدل background-attachment: fixed،
+     الذي يجبر المتصفح على إعادة رسم الصفحة كاملة مع كل بكسل تمرير. */
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background:
+      radial-gradient(120% 70% at 75% -5%, #ffffff 0%, transparent 55%),
+      linear-gradient(180deg, var(--color-bg) 0%, var(--color-bg-2) 100%);
   }
 
   h1, h2, h3, h4 {
@@ -73,56 +91,229 @@
     letter-spacing: -0.01em;
   }
 
-  /* الأرقام تبقى لاتينية داخل النص العربي لسهولة القراءة */
-  input[type="number"], .tabular {
-    font-variant-numeric: tabular-nums;
-  }
+  /* الأرقام لاتينية داخل النص العربي لسهولة القراءة */
+  input[type="number"], .tabular { font-variant-numeric: tabular-nums; }
 
   :focus-visible {
-    outline: 2px solid var(--color-gold);
+    outline: 2px solid var(--color-brand);
     outline-offset: 2px;
-    border-radius: 6px;
+    border-radius: 8px;
   }
 
-  ::selection {
-    background: var(--color-gold);
-    color: var(--color-on-gold);
-  }
+  ::selection { background: var(--color-brand); color: #fff; }
 
-  /* شريط تمرير هادئ */
   ::-webkit-scrollbar { width: 10px; height: 10px; }
-  ::-webkit-scrollbar-track { background: var(--color-bg); }
+  ::-webkit-scrollbar-track { background: transparent; }
   ::-webkit-scrollbar-thumb {
-    background: #2b313d;
+    background: #cfcfd4;
     border-radius: 999px;
-    border: 2px solid var(--color-bg);
+    border: 2px solid transparent;
+    background-clip: content-box;
   }
-  ::-webkit-scrollbar-thumb:hover { background: #3a4250; }
+  ::-webkit-scrollbar-thumb:hover { background: #b3b3ba; background-clip: content-box; }
 
   canvas { touch-action: pan-y; display: block; }
 }
 
 @layer components {
-  /* بطاقة زجاجية */
+
+  /* =========================================================
+     الزجاج — شفافية مضبَّبة + حافة لامعة + ظل رمادي
+     ======================================================= */
+  .glass {
+    position: relative;
+    background:
+      linear-gradient(150deg, rgb(255 255 255 / 0.86) 0%, rgb(255 255 255 / 0.56) 100%);
+    backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-sat));
+    -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-sat));
+    border: 1px solid rgb(255 255 255 / 0.9);
+    box-shadow:
+      inset 0 1px 0 0 rgb(255 255 255 / 0.95),
+      inset 0 -1px 0 0 rgb(255 255 255 / 0.4),
+      0 1px 2px 0 rgb(10 10 11 / 0.07),
+      0 12px 32px -12px rgb(10 10 11 / 0.22);
+  }
+
   .card {
-    background: color-mix(in oklab, var(--color-surface) 88%, transparent);
+    background: var(--color-surface);
     border: 1px solid var(--color-line);
     border-radius: var(--radius-card);
-    box-shadow: 0 1px 0 0 rgb(255 255 255 / 0.03) inset, 0 18px 40px -24px rgb(0 0 0 / 0.9);
+    box-shadow:
+      inset 0 1px 0 0 rgb(255 255 255 / 1),
+      0 1px 2px 0 rgb(10 10 11 / 0.05),
+      0 18px 40px -24px rgb(10 10 11 / 0.32);
   }
 
   .card-hover {
-    transition: transform 220ms var(--ease-out-expo), border-color 220ms, box-shadow 220ms;
+    transition: transform 260ms var(--ease-out-expo),
+                border-color 260ms,
+                box-shadow 260ms;
   }
   .card-hover:hover {
     transform: translateY(-3px);
-    border-color: color-mix(in oklab, var(--color-gold) 35%, var(--color-line));
-    box-shadow: 0 1px 0 0 rgb(255 255 255 / 0.05) inset, 0 26px 50px -26px rgb(0 0 0 / 1);
+    border-color: var(--color-brand-soft);
+    box-shadow: 0 26px 50px -26px rgb(10 10 11 / 0.42);
   }
 
-  /* توهج ذهبي خلفي */
-  .glow-gold {
-    background: radial-gradient(60% 60% at 50% 40%, rgb(224 177 92 / 0.16), transparent 70%);
+  /* =========================================================
+     الضغط المائي — ارتداد زنبركي مثل iOS (للأزرار)
+     ======================================================= */
+  .liquid {
+    transition:
+      transform 420ms var(--ease-spring),
+      box-shadow 300ms var(--ease-out-expo),
+      background-color 220ms;
+    will-change: transform;
+  }
+  .liquid:active { transform: scale(0.955); }
+
+  /* لمعة تمرّ فوق العنصر عند المرور بالفأرة */
+  .liquid-sheen { overflow: hidden; }
+  .liquid-sheen::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+    background: linear-gradient(
+      105deg,
+      transparent 30%,
+      rgb(255 255 255 / 0.4) 45%,
+      rgb(255 255 255 / 0.7) 50%,
+      rgb(255 255 255 / 0.4) 55%,
+      transparent 70%
+    );
+    background-size: 280% 100%;
+    background-position: 140% 0;
+    opacity: 0;
+    transition: opacity 200ms;
+  }
+  .liquid-sheen:hover::after {
+    opacity: 1;
+    animation: sheen-sweep 900ms var(--ease-out-expo);
+  }
+
+  /* =========================================================
+     السلايدر — شكل بسيط بلا أي حركة
+     مضمار رفيع + مقبض أبيض بيضاوي داخله شريط أسود.
+     يقرأ --p (كسر بين 0 و 1) من الـ JSX.
+     ======================================================= */
+  .slider {
+    position: relative;
+    height: 2.75rem;              /* 44px — هدف لمس مريح */
+    --p: 0;
+    --thumb-w: 2.75rem;
+    --thumb-h: 1.75rem;
+    --bar-h: 0.5rem;
+  }
+
+  .slider__track,
+  .slider__fill {
+    position: absolute;
+    top: 50%;
+    height: var(--bar-h);
+    margin-top: calc(var(--bar-h) / -2);
+    border-radius: var(--radius-pill);
+  }
+
+  .slider__track {
+    inset-inline: 0;
+    background: #e8e8eb;
+    box-shadow: inset 0 1px 2px 0 rgb(10 10 11 / 0.07);
+  }
+
+  /* التعبئة تنتهي عند مركز المقبض تمامًا — مثل السلايدر الأصلي */
+  .slider__fill {
+    inset-inline-start: 0;
+    width: calc(var(--thumb-w) / 2 + var(--p) * (100% - var(--thumb-w)));
+    background: var(--color-brand);
+  }
+
+  .slider__thumb {
+    position: absolute;
+    top: 50%;
+    inset-inline-start: calc(var(--p) * (100% - var(--thumb-w)));
+    display: grid;
+    place-items: center;
+    width: var(--thumb-w);
+    height: var(--thumb-h);
+    margin-top: calc(var(--thumb-h) / -2);
+    border-radius: var(--radius-pill);
+    background: #ffffff;
+    box-shadow:
+      0 1px 2px 0 rgb(10 10 11 / 0.2),
+      0 6px 14px -4px rgb(10 10 11 / 0.24);
+    pointer-events: none;
+  }
+
+  /* الشريط الصغير داخل المقبض */
+  .slider__thumb::after {
+    content: "";
+    width: 1.375rem;
+    height: 0.5rem;
+    border-radius: var(--radius-pill);
+    background: var(--color-brand);
+  }
+
+  /* الإدخال الحقيقي شفاف فوق الكل — الكيبورد وقارئ الشاشة يشتغلان */
+  .slider__input {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    opacity: 0;
+    cursor: pointer;
+    -webkit-appearance: none;
+    appearance: none;
+    background: transparent;
+  }
+  .slider__input::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 2.75rem;
+    height: 2.75rem;
+  }
+  .slider__input::-moz-range-thumb {
+    width: 2.75rem; height: 2.75rem; border: 0; background: transparent;
+  }
+
+  /* حلقة التركيز للكيبورد — ليست حركة، لكنها ضرورية للوصولية */
+  .slider__input:focus-visible ~ .slider__thumb {
+    outline: 2px solid var(--color-brand);
+    outline-offset: 3px;
+  }
+
+  /* =========================================================
+     مفتاح الاختيار (ذكر/أنثى) — الحبّة تنزلق بارتداد
+     ======================================================= */
+  .liquid-segment {
+    position: relative;
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: 1fr;
+    gap: 0.25rem;
+    padding: 0.3125rem;
+    border-radius: var(--radius-pill);
+  }
+  .liquid-segment__pill {
+    position: absolute;
+    top: 0.3125rem;
+    bottom: 0.3125rem;
+    border-radius: var(--radius-pill);
+    background: linear-gradient(160deg, var(--color-brand-vivid), var(--color-brand));
+    box-shadow:
+      inset 0 1px 0 0 rgb(255 255 255 / 0.2),
+      0 4px 14px -4px rgb(10 10 11 / 0.6);
+    transition:
+      left 480ms var(--ease-spring),
+      width 480ms var(--ease-spring);
+  }
+
+  /* =========================================================
+     مساعدات
+     ======================================================= */
+  .glow-brand {
+    background: radial-gradient(60% 60% at 50% 35%, rgb(10 10 11 / 0.07), transparent 70%);
   }
 
   .divider-x {
@@ -130,17 +321,14 @@
     background: linear-gradient(to left, transparent, var(--color-line), transparent);
   }
 
-  /* ظهور تدريجي عند التمرير — transform/opacity فقط للأداء */
+  /* ظهور تدريجي عند التمرير — transform/opacity فقط */
   .reveal {
     opacity: 0;
     transform: translateY(18px);
     transition: opacity 520ms var(--ease-out-expo), transform 520ms var(--ease-out-expo);
     will-change: opacity, transform;
   }
-  .reveal.is-in {
-    opacity: 1;
-    transform: none;
-  }
+  .reveal.is-in { opacity: 1; transform: none; }
 }
 
 @layer utilities {
@@ -148,13 +336,30 @@
   .text-pretty { text-wrap: pretty; }
   .shell { width: 100%; max-width: 74rem; margin-inline: auto; padding-inline: 1.25rem; }
   .shell-narrow { width: 100%; max-width: 52rem; margin-inline: auto; padding-inline: 1.25rem; }
-  .stripes {
-    background-image: repeating-linear-gradient(
-      -45deg,
-      rgb(255 255 255 / 0.03) 0 1px,
-      transparent 1px 9px
-    );
+
+  /* شبكة قياس خفيفة — خلفية صندوق القالب */
+  .grid-paper {
+    background-image:
+      linear-gradient(to left, rgb(10 10 11 / 0.05) 1px, transparent 1px),
+      linear-gradient(to bottom, rgb(10 10 11 / 0.05) 1px, transparent 1px);
+    background-size: 26px 26px;
   }
+}
+
+/* ------------------------------ حركات مفاتيح ----------------------------- */
+@keyframes sheen-sweep {
+  from { background-position: 140% 0; }
+  to   { background-position: -140% 0; }
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes pop-in {
+  from { opacity: 0; transform: translateY(10px) scale(0.985); }
+  to   { opacity: 1; transform: none; }
 }
 
 /* حركة أقل لمن يطلبها */
@@ -169,7 +374,7 @@
 }
 
 /* ===========================================================
-   وضع الطباعة — يُستخدم لتصدير PDF من لوحة التحكم
+   وضع الطباعة — لتصدير PDF من لوحة التحكم لاحقًا
    =========================================================== */
 .print-root { display: none; }
 
@@ -185,22 +390,7 @@
     font-family: var(--font-sans);
   }
   .print-root table { width: 100%; border-collapse: collapse; font-size: 10.5pt; }
-  .print-root th, .print-root td {
-    border: 1px solid #999;
-    padding: 5px 6px;
-    text-align: center;
-  }
+  .print-root th, .print-root td { border: 1px solid #999; padding: 5px 6px; text-align: center; }
   .print-root thead { background: #eee; display: table-header-group; }
   .print-root tr { break-inside: avoid; }
-}
-
-/* ------------------------------ حركات مفاتيح ----------------------------- */
-@keyframes fade-in {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-
-@keyframes pop-in {
-  from { opacity: 0; transform: translateY(10px) scale(0.985); }
-  to { opacity: 1; transform: none; }
 }

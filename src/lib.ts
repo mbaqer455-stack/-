@@ -24,9 +24,7 @@ export interface Submission {
   id: string;
   createdAt: number;
   fullName: string;
-  studentId: string;
   phone: string;
-  section: string;
   gender: Gender;
   height: number;       // الطول (سم)
   weight: number;       // الوزن (كغم)
@@ -86,6 +84,7 @@ export const MEASURE_FIELDS: FieldDef[] = [
 
 export const GENDER_LABEL: Record<Gender, string> = { male: 'ذكر', female: 'أنثى' };
 
+
 export const DEFAULT_MEASURES: Record<MeasureKey, number> = {
   height: 172, weight: 68, width: 44, chestWidth: 50, chestLength: 46, sleeveLength: 60,
 };
@@ -129,7 +128,6 @@ export function validateSubmission(v: Partial<Submission>): FormErrors {
   const e: FormErrors = {};
 
   if (!v.fullName || v.fullName.trim().length < 3) e.fullName = 'اكتب الاسم الثلاثي (3 أحرف على الأقل)';
-  if (!v.studentId || !v.studentId.trim()) e.studentId = 'الرقم الجامعي / رقم الطالب مطلوب';
   if (v.phone && !/^[0-9+\s-]{7,15}$/.test(v.phone.trim())) e.phone = 'رقم هاتف غير صالح';
   if (!v.gender) e.gender = 'اختر الجنس';
 
@@ -585,7 +583,6 @@ export const api = {
       'محمد باقر حسن', 'زينب علي كريم', 'أحمد صباح جاسم', 'فاطمة نور الدين',
       'يوسف عبد الرزاق', 'مريم حيدر عباس', 'عمر ياسين محمود', 'رقية سعد الله',
     ];
-    const sections = ['المرحلة الأولى - أ', 'المرحلة الأولى - ب', 'المرحلة الثانية - أ', 'المرحلة الثالثة'];
     const jitter = (n: number, s: number) => Math.round((n + (Math.random() - 0.5) * s) * 2) / 2;
 
     const rows: Submission[] = names.map((fullName, i) => {
@@ -595,9 +592,7 @@ export const api = {
         id: uid(),
         createdAt: Date.now() - i * 36e5 * 7,
         fullName,
-        studentId: `2024${String(1100 + i * 7).padStart(4, '0')}`,
         phone: `0770${Math.floor(1000000 + Math.random() * 8999999)}`,
-        section: sections[i % sections.length],
         gender,
         height: Math.round(jitter(172 * base, 12)),
         weight: jitter(70 * base, 18),
@@ -656,8 +651,6 @@ function captureFrame(file: File): Promise<{ poster: Blob | null; duration: numb
 const EXPORT_COLUMNS: { label: string; get: (s: Submission) => string }[] = [
   { label: 'التاريخ', get: (s) => formatDate(s.createdAt) },
   { label: 'الاسم', get: (s) => s.fullName },
-  { label: 'الرقم الجامعي', get: (s) => s.studentId },
-  { label: 'المرحلة/الشعبة', get: (s) => s.section || '—' },
   { label: 'الجنس', get: (s) => GENDER_LABEL[s.gender] },
   ...MEASURE_FIELDS.map((f) => ({
     label: `${f.label} (${f.unit})`,

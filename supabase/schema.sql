@@ -18,9 +18,7 @@ create table if not exists public.submissions (
   id             text primary key,
   "createdAt"    bigint      not null,
   "fullName"     text        not null,
-  "studentId"    text        not null,
   phone          text        not null default '',
-  section        text        not null default '',
   gender         text        not null check (gender in ('male', 'female')),
   height         numeric     not null,
   weight         numeric     not null,
@@ -30,6 +28,20 @@ create table if not exists public.submissions (
   "sleeveLength" numeric     not null,
   notes          text        not null default ''
 );
+
+-- حقول أُزيلت من النموذج (الرقم الجامعي/المرحلة/الشعبة).
+-- لا نحذف الأعمدة حتى لا تضيع بيانات قديمة — نُرخي قيد NOT NULL فقط
+-- كي تنجح الإضافات الجديدة على قاعدة أُنشئت قبل الإزالة.
+do $$
+begin
+  if exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'submissions' and column_name = 'studentId'
+  ) then
+    execute 'alter table public.submissions alter column "studentId" drop not null';
+    execute 'alter table public.submissions alter column "studentId" set default ''''';
+  end if;
+end $$;
 
 create index if not exists submissions_created_idx on public.submissions ("createdAt" desc);
 
