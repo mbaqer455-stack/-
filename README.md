@@ -8,11 +8,22 @@
 
 ## التشغيل
 
+يحتاج **Node.js 20 أو أحدث** ([تحميل](https://nodejs.org)).
+
 ```bash
-npm install      # مرة واحدة
-npm run dev      # التطوير على http://localhost:5173
-npm run build    # نسخة الإنتاج في مجلد dist
-npm run preview  # معاينة نسخة الإنتاج
+git clone https://github.com/mbaqer455-stack/-.git qias-studio
+cd qias-studio
+
+npm install      # مرة واحدة — تحميل المكتبات
+npm run dev      # التطوير، يفتح المتصفح تلقائيًا على http://localhost:5173
+```
+
+أوامر أخرى:
+
+```bash
+npm run build     # نسخة الإنتاج في مجلد dist
+npm run preview   # معاينة نسخة الإنتاج
+npm run typecheck # فحص الأنواع فقط
 ```
 
 رمز الدخول للوحة التحكم في القالب: **1234** (يمكن تغييره من تبويب الإعدادات).
