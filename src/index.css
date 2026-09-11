@@ -1,0 +1,206 @@
+@import "tailwindcss";
+
+/* ===========================================================
+   قياس — Design System (Dark-first, Arabic RTL)
+   Style: Modern Dark / Cinematic  ·  Accent: Gold
+   =========================================================== */
+@theme {
+  /* Surfaces */
+  --color-bg: #0a0c10;
+  --color-surface: #11141b;
+  --color-surface-2: #171b24;
+  --color-line: #262b36;
+
+  /* Text */
+  --color-ink: #f4f1ea;
+  --color-ink-dim: #a6adbb;
+  --color-ink-faint: #79828f;
+
+  /* Brand */
+  --color-gold: #e0b15c;
+  --color-gold-soft: #f0d49b;
+  --color-gold-deep: #a97a2e;
+  --color-on-gold: #150f05;
+
+  /* Semantic */
+  --color-mint: #55d6a8;
+  --color-sky: #6aa8ff;
+  --color-rose: #f2637a;
+
+  /* Type */
+  --font-sans: "Noto Sans Arabic", "Segoe UI", Tahoma, system-ui, sans-serif;
+  --font-display: "Noto Kufi Arabic", "Noto Sans Arabic", "Segoe UI", Tahoma, sans-serif;
+
+  /* Radii */
+  --radius-card: 1.25rem;
+  --radius-pill: 999px;
+
+  /* Motion */
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@layer base {
+  :root {
+    color-scheme: dark;
+    --header-h: 4rem;
+  }
+
+  * {
+    border-color: var(--color-line);
+  }
+
+  html {
+    scroll-behavior: smooth;
+    scroll-padding-top: calc(var(--header-h) + 1rem);
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    margin: 0;
+    background: var(--color-bg);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    font-size: 16px;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
+  }
+
+  h1, h2, h3, h4 {
+    font-family: var(--font-display);
+    line-height: 1.25;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+  }
+
+  /* الأرقام تبقى لاتينية داخل النص العربي لسهولة القراءة */
+  input[type="number"], .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-gold);
+    outline-offset: 2px;
+    border-radius: 6px;
+  }
+
+  ::selection {
+    background: var(--color-gold);
+    color: var(--color-on-gold);
+  }
+
+  /* شريط تمرير هادئ */
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-track { background: var(--color-bg); }
+  ::-webkit-scrollbar-thumb {
+    background: #2b313d;
+    border-radius: 999px;
+    border: 2px solid var(--color-bg);
+  }
+  ::-webkit-scrollbar-thumb:hover { background: #3a4250; }
+
+  canvas { touch-action: pan-y; display: block; }
+}
+
+@layer components {
+  /* بطاقة زجاجية */
+  .card {
+    background: color-mix(in oklab, var(--color-surface) 88%, transparent);
+    border: 1px solid var(--color-line);
+    border-radius: var(--radius-card);
+    box-shadow: 0 1px 0 0 rgb(255 255 255 / 0.03) inset, 0 18px 40px -24px rgb(0 0 0 / 0.9);
+  }
+
+  .card-hover {
+    transition: transform 220ms var(--ease-out-expo), border-color 220ms, box-shadow 220ms;
+  }
+  .card-hover:hover {
+    transform: translateY(-3px);
+    border-color: color-mix(in oklab, var(--color-gold) 35%, var(--color-line));
+    box-shadow: 0 1px 0 0 rgb(255 255 255 / 0.05) inset, 0 26px 50px -26px rgb(0 0 0 / 1);
+  }
+
+  /* توهج ذهبي خلفي */
+  .glow-gold {
+    background: radial-gradient(60% 60% at 50% 40%, rgb(224 177 92 / 0.16), transparent 70%);
+  }
+
+  .divider-x {
+    height: 1px;
+    background: linear-gradient(to left, transparent, var(--color-line), transparent);
+  }
+
+  /* ظهور تدريجي عند التمرير — transform/opacity فقط للأداء */
+  .reveal {
+    opacity: 0;
+    transform: translateY(18px);
+    transition: opacity 520ms var(--ease-out-expo), transform 520ms var(--ease-out-expo);
+    will-change: opacity, transform;
+  }
+  .reveal.is-in {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@layer utilities {
+  .text-balance { text-wrap: balance; }
+  .text-pretty { text-wrap: pretty; }
+  .shell { width: 100%; max-width: 74rem; margin-inline: auto; padding-inline: 1.25rem; }
+  .shell-narrow { width: 100%; max-width: 52rem; margin-inline: auto; padding-inline: 1.25rem; }
+  .stripes {
+    background-image: repeating-linear-gradient(
+      -45deg,
+      rgb(255 255 255 / 0.03) 0 1px,
+      transparent 1px 9px
+    );
+  }
+}
+
+/* حركة أقل لمن يطلبها */
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+  .reveal { opacity: 1; transform: none; }
+}
+
+/* ===========================================================
+   وضع الطباعة — يُستخدم لتصدير PDF من لوحة التحكم
+   =========================================================== */
+.print-root { display: none; }
+
+@media print {
+  @page { size: A4; margin: 14mm 12mm; }
+
+  body.is-printing { background: #fff !important; }
+  body.is-printing > #root { display: none !important; }
+  body.is-printing .print-root {
+    display: block !important;
+    background: #fff;
+    color: #000;
+    font-family: var(--font-sans);
+  }
+  .print-root table { width: 100%; border-collapse: collapse; font-size: 10.5pt; }
+  .print-root th, .print-root td {
+    border: 1px solid #999;
+    padding: 5px 6px;
+    text-align: center;
+  }
+  .print-root thead { background: #eee; display: table-header-group; }
+  .print-root tr { break-inside: avoid; }
+}
+
+/* ------------------------------ حركات مفاتيح ----------------------------- */
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes pop-in {
+  from { opacity: 0; transform: translateY(10px) scale(0.985); }
+  to { opacity: 1; transform: none; }
+}
