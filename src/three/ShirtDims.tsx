@@ -28,7 +28,7 @@ const ON = '#44444b';       // رقم فوق القماش (القماش رماد
 
 export default function ShirtDims({ measures, gender, active }: Props) {
   const s = shirtOf(measures, gender);
-  const { inner, outer } = cuffCorners(s);
+  const { outer } = cuffCorners(s);
   const [tipX, tipY] = shoulderTip(s);
   const [apX, apY] = armpit(s);
   const { nx, ny } = sleeveAxis(s);
@@ -81,9 +81,6 @@ export default function ShirtDims({ measures, gender, active }: Props) {
         value={measures.sleeveLength}
         lx={armMidX + nx * off} ly={armMidY + ny * off}
       />
-
-      {/* نقطة نهاية الكم — تربط الرقم بالفتحة */}
-      <circle cx={inner[0]} cy={Y(inner[1])} r={0.9} fill={LINE} opacity={0.35} />
     </svg>
   );
 }
