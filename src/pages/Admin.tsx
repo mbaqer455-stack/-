@@ -12,9 +12,10 @@
 
 import { useMemo, useState } from 'react';
 import {
-  api, exportCsv, formatBytes, formatDate, formatDuration, GENDER_LABEL,
-  isCloud, MEASURE_FIELDS, printPdf, useAdminSession, useSettings, useSubmissions,
-  useToasts, useVideos, type Submission, type VideoItem,
+  api, computeSize, exportCsv, exportFactoryCsv, formatBytes, formatDate, formatDuration,
+  GENDER_LABEL, isCloud, MEASURE_FIELDS, printPdf, SIZE_ORDER, summarizeSizes,
+  useAdminSession, useSettings, useSubmissions, useToasts, useVideos,
+  type Submission, type VideoItem,
 } from '../lib';
 import {
   Badge, Button, EmptyState, Field, Icons, Spinner, Stat, Switch,
@@ -189,6 +190,7 @@ type Push = (text: string, tone?: 'ok' | 'error' | 'info') => void;
 function DataTab({ push }: { push: Push }) {
   const rows = useSubmissions();
   const [q, setQ] = useState('');
+  const [printMode, setPrintMode] = useState<'all' | 'factory'>('all');
   const { confirm, dialog } = useConfirm();
 
   const filtered = useMemo(() => {
@@ -206,6 +208,9 @@ function DataTab({ push }: { push: Push }) {
     });
   };
 
+  const printAll = () => { setPrintMode('all'); printPdf(); };
+  const printFactory = () => { setPrintMode('factory'); printPdf(); };
+
   return (
     <div className="flex flex-col gap-5">
       <div className="grid gap-3 sm:grid-cols-3">
@@ -213,6 +218,8 @@ function DataTab({ push }: { push: Push }) {
         <Stat icon="shirt" label="ذكور" value={String(rows.filter((r) => r.gender === 'male').length)} />
         <Stat icon="shirt" label="إناث" value={String(rows.filter((r) => r.gender === 'female').length)} />
       </div>
+
+      <SizesSummary rows={filtered} />
 
       <div className="flex flex-wrap items-center gap-3">
         <div className="relative min-w-56 flex-1">
@@ -225,11 +232,17 @@ function DataTab({ push }: { push: Push }) {
           <Icons.search className="pointer-events-none absolute right-3.5 top-1/2 size-4 -translate-y-1/2 text-ink-faint" />
         </div>
 
-        <Button variant="outline" icon="printer" onClick={printPdf} disabled={!filtered.length}>
+        <Button variant="outline" icon="printer" onClick={printAll} disabled={!filtered.length}>
           استخراج PDF
         </Button>
         <Button variant="outline" icon="download" onClick={() => exportCsv(filtered)} disabled={!filtered.length}>
           تصدير CSV
+        </Button>
+        <Button variant="outline" icon="printer" onClick={printFactory} disabled={!filtered.length}>
+          طباعة طلب المصنع
+        </Button>
+        <Button variant="outline" icon="download" onClick={() => exportFactoryCsv(filtered)} disabled={!filtered.length}>
+          تصدير طلب المصنع
         </Button>
       </div>
 
@@ -238,34 +251,40 @@ function DataTab({ push }: { push: Push }) {
           <table className="w-full min-w-200 text-sm">
             <thead className="border-b border-line text-xs text-ink-faint">
               <tr>
-                {['التاريخ', 'الاسم', 'الهاتف', 'الجنس',
+                {['التاريخ', 'الاسم', 'الهاتف', 'الجنس', 'المقاس',
                   ...MEASURE_FIELDS.map((f) => f.label), ''].map((h, i) => (
                   <th key={i} className="whitespace-nowrap px-3 py-3 text-start font-medium">{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
-              {filtered.map((r) => (
-                <tr key={r.id} className="border-b border-line-soft last:border-0 hover:bg-surface-2/60">
-                  <td className="tabular whitespace-nowrap px-3 py-2.5 text-ink-faint">{formatDate(r.createdAt)}</td>
-                  <td className="whitespace-nowrap px-3 py-2.5 font-medium text-ink">{r.fullName}</td>
-                  <td className="tabular whitespace-nowrap px-3 py-2.5">{r.phone || '—'}</td>
-                  <td className="whitespace-nowrap px-3 py-2.5">{GENDER_LABEL[r.gender]}</td>
-                  {MEASURE_FIELDS.map((f) => (
-                    <td key={f.key} className="tabular whitespace-nowrap px-3 py-2.5">{r[f.key]}</td>
-                  ))}
-                  <td className="px-3 py-2.5">
-                    <button
-                      onClick={() => remove(r)}
-                      aria-label={`حذف قياس ${r.fullName}`}
-                      className="grid size-8 cursor-pointer place-items-center rounded-lg text-ink-faint
-                                 transition-colors hover:bg-rose/10 hover:text-rose"
-                    >
-                      <Icons.trash className="size-4" />
-                    </button>
-                  </td>
-                </tr>
-              ))}
+              {filtered.map((r) => {
+                const sized = computeSize(r);
+                return (
+                  <tr key={r.id} className="border-b border-line-soft last:border-0 hover:bg-surface-2/60">
+                    <td className="tabular whitespace-nowrap px-3 py-2.5 text-ink-faint">{formatDate(r.createdAt)}</td>
+                    <td className="whitespace-nowrap px-3 py-2.5 font-medium text-ink">{r.fullName}</td>
+                    <td className="tabular whitespace-nowrap px-3 py-2.5">{r.phone || '—'}</td>
+                    <td className="whitespace-nowrap px-3 py-2.5">{GENDER_LABEL[r.gender]}</td>
+                    <td className="whitespace-nowrap px-3 py-2.5">
+                      <Badge tone={sized.outOfRange ? 'rose' : 'brand'}>{sized.size}</Badge>
+                    </td>
+                    {MEASURE_FIELDS.map((f) => (
+                      <td key={f.key} className="tabular whitespace-nowrap px-3 py-2.5">{r[f.key]}</td>
+                    ))}
+                    <td className="px-3 py-2.5">
+                      <button
+                        onClick={() => remove(r)}
+                        aria-label={`حذف قياس ${r.fullName}`}
+                        className="grid size-8 cursor-pointer place-items-center rounded-lg text-ink-faint
+                                   transition-colors hover:bg-rose/10 hover:text-rose"
+                      >
+                        <Icons.trash className="size-4" />
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -277,9 +296,48 @@ function DataTab({ push }: { push: Push }) {
         />
       )}
 
-      {/* نسخة الطباعة — تظهر فقط عند استخراج PDF */}
-      <PrintSheet rows={filtered} />
+      {/* نسخة الطباعة — تظهر فقط عند استخراج PDF، حسب النوع المختار */}
+      {printMode === 'all' ? <PrintSheet rows={filtered} /> : <FactoryPrintSheet rows={filtered} />}
       {dialog}
+    </div>
+  );
+}
+
+/** توزيع المقاسات — هذا ما يُرسل للمصنع ليعرف كم قطعة يُنتج من كل مقاس */
+function SizesSummary({ rows }: { rows: Submission[] }) {
+  const counts = summarizeSizes(rows);
+  const outOfRange = rows.filter((r) => computeSize(r).outOfRange).length;
+
+  return (
+    <div className="card flex flex-col gap-4 p-5 sm:p-6">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h2 className="text-lg">توزيع المقاسات — لطلب المصنع</h2>
+        <Badge tone="brand" icon="shirt">{rows.length} قطعة</Badge>
+      </div>
+
+      {rows.length ? (
+        <div className="flex flex-wrap gap-2.5">
+          {counts.map((c) => (
+            <div
+              key={c.size}
+              className={`flex items-center gap-2 rounded-xl border px-3.5 py-2.5
+                ${c.count ? 'border-brand/25 bg-brand/8' : 'border-line bg-surface-2/40 opacity-45'}`}
+            >
+              <span className="text-lg font-bold tabular text-ink">{c.count}</span>
+              <span className="text-sm font-medium text-ink-dim">{c.size}</span>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <p className="text-sm text-ink-faint">لا توجد قياسات لعرض توزيعها بعد.</p>
+      )}
+
+      {outOfRange > 0 && (
+        <p className="flex items-center gap-1.5 text-[13px] text-rose">
+          <Icons.alert className="size-3.5 shrink-0" />
+          {outOfRange} قياس خارج الجدول القياسي — يحتاج تفصيلًا خاصًا بدل مقاس جاهز.
+        </p>
+      )}
     </div>
   );
 }
@@ -291,7 +349,7 @@ function PrintSheet({ rows }: { rows: Submission[] }) {
       <table>
         <thead>
           <tr>
-            <th>الاسم</th><th>الهاتف</th><th>الجنس</th>
+            <th>الاسم</th><th>الهاتف</th><th>الجنس</th><th>المقاس</th>
             {MEASURE_FIELDS.map((f) => <th key={f.key}>{f.label}</th>)}
           </tr>
         </thead>
@@ -299,7 +357,46 @@ function PrintSheet({ rows }: { rows: Submission[] }) {
           {rows.map((r) => (
             <tr key={r.id}>
               <td>{r.fullName}</td><td>{r.phone}</td><td>{GENDER_LABEL[r.gender]}</td>
+              <td>{computeSize(r).size}</td>
               {MEASURE_FIELDS.map((f) => <td key={f.key}>{r[f.key]}</td>)}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+/** ورقة طلب المصنع: ملخّص العدد لكل مقاس أولًا، ثم قائمة الأسماء مرتّبة حسب المقاس */
+function FactoryPrintSheet({ rows }: { rows: Submission[] }) {
+  const counts = summarizeSizes(rows).filter((c) => c.count > 0);
+  const sorted = [...rows].sort((a, b) => {
+    const ai = SIZE_ORDER.indexOf(computeSize(a).size);
+    const bi = SIZE_ORDER.indexOf(computeSize(b).size);
+    return ai - bi || a.fullName.localeCompare(b.fullName, 'ar');
+  });
+
+  return (
+    <div className="print-root" aria-hidden="true">
+      <h1 style={{ textAlign: 'center', marginBottom: 12 }}>طلب المصنع — توزيع المقاسات</h1>
+      <table style={{ marginBottom: 18 }}>
+        <thead>
+          <tr><th>المقاس</th><th>العدد</th></tr>
+        </thead>
+        <tbody>
+          {counts.map((c) => <tr key={c.size}><td>{c.size}</td><td>{c.count}</td></tr>)}
+          <tr><td><strong>الإجمالي</strong></td><td><strong>{rows.length}</strong></td></tr>
+        </tbody>
+      </table>
+
+      <table>
+        <thead>
+          <tr><th>الاسم</th><th>الجنس</th><th>المقاس</th></tr>
+        </thead>
+        <tbody>
+          {sorted.map((r) => (
+            <tr key={r.id}>
+              <td>{r.fullName}</td><td>{GENDER_LABEL[r.gender]}</td><td>{computeSize(r).size}</td>
             </tr>
           ))}
         </tbody>

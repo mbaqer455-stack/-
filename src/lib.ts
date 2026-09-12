@@ -13,8 +13,10 @@
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import { isCloud, MEDIA_BUCKET, must, supabase } from './supabase';
+import { computeSize, SIZE_ORDER, summarizeSizes } from './sizing';
 
 export { isCloud };
+export { computeSize, formatSizeSummary, SIZE_ORDER, summarizeSizes, type SizeCount, type SizeLabel, type SizeResult } from './sizing';
 
 /* ----------------------------------- الأنواع ---------------------------- */
 
@@ -652,6 +654,7 @@ const EXPORT_COLUMNS: { label: string; get: (s: Submission) => string }[] = [
   { label: 'التاريخ', get: (s) => formatDate(s.createdAt) },
   { label: 'الاسم', get: (s) => s.fullName },
   { label: 'الجنس', get: (s) => GENDER_LABEL[s.gender] },
+  { label: 'المقاس', get: (s) => computeSize(s).size },
   ...MEASURE_FIELDS.map((f) => ({
     label: `${f.label} (${f.unit})`,
     get: (s: Submission) => String(s[f.key]),
@@ -677,6 +680,37 @@ export function exportCsv(rows: Submission[]): void {
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
   a.download = `qias-measurements-${new Date().toISOString().slice(0, 10)}.csv`;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+
+/**
+ * تصدير مبسّط للمصنع: الاسم والجنس والمقاس فقط، مرتّب حسب المقاس ثم الاسم،
+ * مع صفوف توزيع العدد لكل مقاس في الأعلى — هذا ما يحتاجه المصنع فعليًا للإنتاج.
+ */
+export function exportFactoryCsv(rows: Submission[]): void {
+  const esc = (v: string) => `"${v.replace(/"/g, '""')}"`;
+  const sorted = [...rows].sort((a, b) => {
+    const ai = SIZE_ORDER.indexOf(computeSize(a).size);
+    const bi = SIZE_ORDER.indexOf(computeSize(b).size);
+    return ai - bi || a.fullName.localeCompare(b.fullName, 'ar');
+  });
+
+  const summaryLines = summarizeSizes(rows)
+    .filter((c) => c.count > 0)
+    .map((c) => [esc('توزيع المقاسات'), esc(c.size), esc(String(c.count))].join(','));
+
+  const csv = [
+    ...summaryLines,
+    '',
+    ['الاسم', 'الجنس', 'المقاس'].map(esc).join(','),
+    ...sorted.map((r) => [r.fullName, GENDER_LABEL[r.gender], computeSize(r).size].map(esc).join(',')),
+  ].join('\r\n');
+
+  const blob = new Blob([BOM + csv], { type: 'text/csv;charset=utf-8;' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `qias-factory-order-${new Date().toISOString().slice(0, 10)}.csv`;
   a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 }
