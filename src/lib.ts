@@ -187,7 +187,7 @@ function createCollection<T extends { id: string }>(table: string, localKey: str
       .select('*')
       .order('createdAt', { ascending: false });
 
-    // خطأ الصلاحيات طبيعي للزائر (لا يقرأ بيانات الطلاب) — نتركها فارغة
+    // خطأ الصلاحيات طبيعي للزائر (لا يقرأ بيانات الزبائن) — نتركها فارغة
     if (error) return;
     value = (data ?? []) as T[];
     emit();

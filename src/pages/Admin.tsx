@@ -4,10 +4,10 @@
    سرّية: لا يوجد أي رابط يدلّ عليها في الموقع، والدخول برمز.
      • الوضع المحلي  : رمز واحد (الافتراضي 1234، يُغيَّر من تبويب الإعدادات)
      • الوضع السحابي : بريد وكلمة مرور لحساب Supabase حقيقي،
-                       وسياسات RLS ترفض قراءة بيانات الطلاب بدون تسجيل دخول
+                       وسياسات RLS ترفض قراءة بيانات الزبائن بدون تسجيل دخول
                        حتى لو تجاوز أحدهم الواجهة.
 
-   ثلاثة تبويبات: بيانات الطلاب · الفيديوهات · الإعدادات.
+   ثلاثة تبويبات: بيانات الزبائن · الفيديوهات · الإعدادات.
    ========================================================================== */
 
 import { useMemo, useState } from 'react';
@@ -126,7 +126,7 @@ function Gate({ session }: { session: ReturnType<typeof useAdminSession> }) {
 /* =============================== اللوحة ================================= */
 
 const TABS: { key: Tab; label: string; icon: 'users' | 'video' | 'grid' }[] = [
-  { key: 'data', label: 'بيانات الطلاب', icon: 'users' },
+  { key: 'data', label: 'بيانات الزبائن', icon: 'users' },
   { key: 'videos', label: 'الفيديوهات', icon: 'video' },
   { key: 'settings', label: 'الإعدادات', icon: 'grid' },
 ];
@@ -184,7 +184,7 @@ function Panel({ session }: { session: ReturnType<typeof useAdminSession> }) {
 
 type Push = (text: string, tone?: 'ok' | 'error' | 'info') => void;
 
-/* ---------------------------- بيانات الطلاب ---------------------------- */
+/* ---------------------------- بيانات الزبائن ---------------------------- */
 
 function DataTab({ push }: { push: Push }) {
   const rows = useSubmissions();
@@ -287,7 +287,7 @@ function DataTab({ push }: { push: Push }) {
 function PrintSheet({ rows }: { rows: Submission[] }) {
   return (
     <div className="print-root" aria-hidden="true">
-      <h1 style={{ textAlign: 'center', marginBottom: 12 }}>قياسات الطلاب</h1>
+      <h1 style={{ textAlign: 'center', marginBottom: 12 }}>قياسات الزبائن</h1>
       <table>
         <thead>
           <tr>

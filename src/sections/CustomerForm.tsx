@@ -1,7 +1,7 @@
 /* ============================================================================
-   بيانات الطالب + زر الحفظ
+   بيانات الزبون + زر الحفظ
 
-   يأخذ اسم الطالب، ويحفظه مع القياسات الحالية والجنس.
+   يأخذ اسم الزبون، ويحفظه مع القياسات الحالية والجنس.
    التحقق يعمل عند مغادرة الحقل (onBlur) لا عند الضغط فقط — الخطأ يظهر تحت
    الحقل نفسه، وعند الإرسال يُنقل التركيز لأول حقل خاطئ.
    ========================================================================== */
@@ -24,7 +24,7 @@ interface Props {
   onError: (message: string) => void;
 }
 
-export default function StudentForm({ measures, gender, onSaved, onError }: Props) {
+export default function CustomerForm({ measures, gender, onSaved, onError }: Props) {
   const [v, setV] = useState<Identity>(EMPTY);
   const [errors, setErrors] = useState<FormErrors>({});
   const [touched, setTouched] = useState<Partial<Record<keyof Identity, boolean>>>({});
@@ -36,7 +36,7 @@ export default function StudentForm({ measures, gender, onSaved, onError }: Prop
   const set = (key: keyof Identity) => (value: string) => {
     const next = { ...v, [key]: value };
     setV(next);
-    // بعد أول خطأ نصحّح أثناء الكتابة حتى يرى الطالب الخطأ يختفي
+    // بعد أول خطأ نصحّح أثناء الكتابة حتى يرى الزبون الخطأ يختفي
     if (touched[key]) setErrors(validateSubmission({ ...full(), ...next }));
   };
 
@@ -81,7 +81,7 @@ export default function StudentForm({ measures, gender, onSaved, onError }: Prop
 
   return (
     <form ref={formRef} onSubmit={submit} noValidate className="card flex flex-col gap-5 p-5 sm:p-6">
-      <h2 className="text-lg">بيانات الطالب</h2>
+      <h2 className="text-lg">بيانات الزبون</h2>
 
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label="الاسم الثلاثي" required error={err('fullName')}>

@@ -20,7 +20,7 @@ import {
 import { LiquidSegment, LiquidSlider } from '../liquid';
 import ShirtDims from '../three/ShirtDims';
 import { Icons, Spinner, Toasts } from '../ui';
-import StudentForm from './StudentForm';
+import CustomerForm from './CustomerForm';
 
 const Shirt2D = lazy(() => import('../three/Shirt2D'));
 
@@ -104,9 +104,9 @@ export default function MeasureSection() {
         </div>
       </div>
 
-      {/* ----- بيانات الطالب + الحفظ ----- */}
+      {/* ----- بيانات الزبون + الحفظ ----- */}
       <div className="mt-6">
-        <StudentForm
+        <CustomerForm
           measures={measures}
           gender={gender}
           onSaved={(name) => push(`تم حفظ قياس ${name}`)}
