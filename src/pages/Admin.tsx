@@ -40,12 +40,16 @@ export default function Admin() {
 
 /* ============================== بوابة الدخول ============================= */
 
+type CloudMode = 'password' | 'magic';
+
 function Gate({ session }: { session: ReturnType<typeof useAdminSession> }) {
+  const [mode, setMode] = useState<CloudMode>('password');
   const [pin, setPin] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [sent, setSent] = useState(false);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -57,9 +61,23 @@ function Gate({ session }: { session: ReturnType<typeof useAdminSession> }) {
     }
 
     setBusy(true);
+    if (mode === 'magic') {
+      const message = await session.sendMagicLink(email);
+      setBusy(false);
+      if (message) setError(message);
+      else setSent(true);
+      return;
+    }
+
     const message = await session.signIn(email, password);
     setBusy(false);
     if (message) setError(message);
+  };
+
+  const switchMode = (m: CloudMode) => {
+    setMode(m);
+    setError('');
+    setSent(false);
   };
 
   return (
@@ -77,22 +95,50 @@ function Gate({ session }: { session: ReturnType<typeof useAdminSession> }) {
 
         {isCloud ? (
           <>
-            <Field label="البريد الإلكتروني">
-              {(id) => (
-                <TextInput
-                  id={id} type="email" value={email} dir="ltr" autoComplete="username"
-                  onChange={(e) => setEmail(e.target.value)}
-                />
-              )}
-            </Field>
-            <Field label="كلمة المرور">
-              {(id) => (
-                <TextInput
-                  id={id} type="password" value={password} dir="ltr" autoComplete="current-password"
-                  onChange={(e) => setPassword(e.target.value)}
-                />
-              )}
-            </Field>
+            <div className="flex gap-1 rounded-pill border border-line bg-surface-2 p-1">
+              {([
+                { key: 'password', label: 'كلمة المرور' },
+                { key: 'magic', label: 'رابط عبر البريد' },
+              ] as const).map((m) => (
+                <button
+                  key={m.key}
+                  type="button"
+                  onClick={() => switchMode(m.key)}
+                  className={`h-9 flex-1 cursor-pointer rounded-pill text-sm transition-colors duration-200
+                    ${mode === m.key ? 'bg-brand font-semibold text-on-brand' : 'text-ink-dim hover:text-ink'}`}
+                >
+                  {m.label}
+                </button>
+              ))}
+            </div>
+
+            {sent ? (
+              <p className="flex items-center gap-2 rounded-xl border border-line bg-surface-2/60 p-3 text-[13px] text-ink-dim">
+                <Icons.check className="size-4 shrink-0 text-brand" />
+                أُرسل رابط الدخول إلى {email.trim()}. افتحه من نفس هذا الجهاز خلال ساعة.
+              </p>
+            ) : (
+              <>
+                <Field label="البريد الإلكتروني">
+                  {(id) => (
+                    <TextInput
+                      id={id} type="email" value={email} dir="ltr" autoComplete="username"
+                      onChange={(e) => setEmail(e.target.value)}
+                    />
+                  )}
+                </Field>
+                {mode === 'password' && (
+                  <Field label="كلمة المرور">
+                    {(id) => (
+                      <TextInput
+                        id={id} type="password" value={password} dir="ltr" autoComplete="current-password"
+                        onChange={(e) => setPassword(e.target.value)}
+                      />
+                    )}
+                  </Field>
+                )}
+              </>
+            )}
           </>
         ) : (
           <Field label="الرمز">
@@ -118,7 +164,11 @@ function Gate({ session }: { session: ReturnType<typeof useAdminSession> }) {
           </p>
         )}
 
-        <Button type="submit" size="lg" icon="lock" loading={busy}>دخول</Button>
+        {!sent && (
+          <Button type="submit" size="lg" icon="lock" loading={busy}>
+            {mode === 'magic' ? 'أرسل رابط الدخول' : 'دخول'}
+          </Button>
+        )}
       </form>
     </div>
   );

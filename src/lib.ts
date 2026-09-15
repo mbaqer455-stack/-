@@ -798,6 +798,12 @@ export interface AdminSession {
   email: string;
   /** الوضع السحابي: دخول ببريد وكلمة مرور. يرجع رسالة الخطأ أو null عند النجاح */
   signIn: (email: string, password: string) => Promise<string | null>;
+  /**
+   * الوضع السحابي: يرسل رابط دخول لمرة واحدة للبريد. shouldCreateUser: false
+   * يمنع إنشاء حساب جديد — يعمل فقط لبريد مشرف أُنشئ مسبقًا من Supabase.
+   * يرجع رسالة الخطأ أو null عند نجاح الإرسال.
+   */
+  sendMagicLink: (email: string) => Promise<string | null>;
   /** الوضع المحلي: دخول برمز */
   signInPin: (pin: string) => boolean;
   signOut: () => void;
@@ -839,6 +845,18 @@ export function useAdminSession(): AdminSession {
     return error.message;
   }, []);
 
+  const sendMagicLink = useCallback(async (mail: string): Promise<string | null> => {
+    if (!supabase) return 'الموقع غير مربوط بقاعدة البيانات';
+    const { error } = await supabase.auth.signInWithOtp({
+      email: mail.trim(),
+      options: { shouldCreateUser: false, emailRedirectTo: `${window.location.origin}/admin` },
+    });
+    if (!error) return null;
+    if (/Failed to fetch/i.test(error.message)) return 'تعذّر الاتصال — تحقق من الإنترنت';
+    if (/rate limit/i.test(error.message)) return 'محاولات كثيرة — انتظر قليلًا وأعد المحاولة';
+    return error.message;
+  }, []);
+
   const signInPin = useCallback((pin: string): boolean => {
     if (pin !== settingsStore.get().pin) return false;
     sessionStorage.setItem(LOCAL_SESSION_KEY, '1');
@@ -856,5 +874,5 @@ export function useAdminSession(): AdminSession {
     setEmail('');
   }, []);
 
-  return { authed, checking, email, signIn, signInPin, signOut };
+  return { authed, checking, email, signIn, sendMagicLink, signInPin, signOut };
 }
