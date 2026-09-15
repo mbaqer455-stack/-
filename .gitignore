@@ -8,3 +8,6 @@ dist
 # أسرار المشروع — لا تُرفع
 .env
 .env.local
+
+# إعدادات Claude Code الخاصة بجهازي — الرفع التلقائي
+.claude/settings.local.json
