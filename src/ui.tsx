@@ -338,6 +338,50 @@ export function Switch({ checked, onChange, label, description }: SwitchProps) {
   );
 }
 
+/* ----------------------------- مربّع الاختيار ---------------------------- */
+
+interface CheckboxProps {
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+  label: ReactNode;
+}
+
+/**
+ * المربّع الحقيقي مخفيّ لا محذوف (sr-only)، فيبقى للوحة المفاتيح وقارئ الشاشة
+ * سلوكهما الطبيعي، ويُرسم مربّعٌ بديل يتبع حالته عبر peer-checked.
+ */
+export function Checkbox({ checked, onChange, label }: CheckboxProps) {
+  const id = useId();
+  return (
+    <label
+      htmlFor={id}
+      className="flex w-fit cursor-pointer select-none items-center gap-2.5 text-sm text-ink"
+    >
+      <input
+        id={id}
+        type="checkbox"
+        checked={checked}
+        onChange={(e) => onChange(e.target.checked)}
+        className="peer sr-only"
+      />
+      <span
+        aria-hidden="true"
+        className="grid size-5 shrink-0 place-items-center rounded-md border border-line bg-surface-2
+                   text-transparent transition-colors duration-200
+                   peer-hover:border-brand-soft
+                   peer-checked:border-brand peer-checked:bg-brand peer-checked:text-on-brand
+                   peer-focus-visible:ring-2 peer-focus-visible:ring-brand/25"
+      >
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.2"
+             strokeLinecap="round" strokeLinejoin="round" className="size-3">
+          <path d="M4.5 12.5l5 5 10-11" />
+        </svg>
+      </span>
+      {label}
+    </label>
+  );
+}
+
 /* --------------------------------- شارات -------------------------------- */
 
 export function Badge({

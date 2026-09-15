@@ -11,7 +11,7 @@ import {
   api, validateSubmission,
   type FormErrors, type Gender, type MeasureKey, type Submission,
 } from '../lib';
-import { Button, Field, TextInput } from '../ui';
+import { Button, Checkbox, Field, TextInput } from '../ui';
 
 type Identity = Pick<Submission, 'fullName' | 'notes'>;
 
@@ -29,6 +29,8 @@ export default function CustomerForm({ measures, gender, onSaved, onError }: Pro
   const [errors, setErrors] = useState<FormErrors>({});
   const [touched, setTouched] = useState<Partial<Record<keyof Identity, boolean>>>({});
   const [saving, setSaving] = useState(false);
+  // إقرار الزبون بأن القياسات صحيحة — الزر مقفل حتى يؤشّره
+  const [confirmed, setConfirmed] = useState(false);
   const formRef = useRef<HTMLFormElement>(null);
 
   const full = (): Partial<Submission> => ({ ...v, ...measures, gender });
@@ -47,6 +49,8 @@ export default function CustomerForm({ measures, gender, onSaved, onError }: Pro
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!confirmed) return;
+
     const found = validateSubmission(full());
     setErrors(found);
     setTouched({ fullName: true });
@@ -69,6 +73,7 @@ export default function CustomerForm({ measures, gender, onSaved, onError }: Pro
       setV(EMPTY);
       setErrors({});
       setTouched({});
+      setConfirmed(false); // الزبون التالي يؤكّد قياسه بنفسه
     } catch (err) {
       onError(err instanceof Error ? err.message : 'تعذّر حفظ القياس');
     } finally {
@@ -105,9 +110,20 @@ export default function CustomerForm({ measures, gender, onSaved, onError }: Pro
         </Field>
       </div>
 
-      <Button type="submit" size="lg" icon="check" loading={saving} className="w-full sm:w-auto sm:self-start">
-        {saving ? 'جارٍ الحفظ…' : 'حفظ القياس'}
-      </Button>
+      <div className="flex flex-col gap-4">
+        <Checkbox
+          checked={confirmed}
+          onChange={setConfirmed}
+          label="هل أنت متأكد من القياس؟"
+        />
+
+        <Button
+          type="submit" size="lg" icon="check" loading={saving} disabled={!confirmed}
+          className="w-full sm:w-auto sm:self-start"
+        >
+          {saving ? 'جارٍ الحفظ…' : 'حفظ القياس'}
+        </Button>
+      </div>
     </form>
   );
 }
