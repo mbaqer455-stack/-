@@ -86,7 +86,7 @@ export const GENDER_LABEL: Record<Gender, string> = { male: 'ذكر', female: '�
 
 
 export const DEFAULT_MEASURES: Record<MeasureKey, number> = {
-  height: 172, weight: 68, width: 44, chestWidth: 50, chestLength: 46, sleeveLength: 60,
+  height: 178, weight: 49, width: 55.5, chestWidth: 51.5, chestLength: 65, sleeveLength: 58,
 };
 
 /* -------------------------------- أدوات عامة ---------------------------- */
