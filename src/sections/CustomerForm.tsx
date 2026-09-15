@@ -1,7 +1,7 @@
 /* ============================================================================
    بيانات الزبون + زر الحفظ
 
-   يأخذ اسم الزبون، ويحفظه مع القياسات الحالية والجنس.
+   يأخذ اسم الزبون وملاحظته، ويحفظهما مع القياسات الحالية والجنس.
    التحقق يعمل عند مغادرة الحقل (onBlur) لا عند الضغط فقط — الخطأ يظهر تحت
    الحقل نفسه، وعند الإرسال يُنقل التركيز لأول حقل خاطئ.
    ========================================================================== */
@@ -13,9 +13,9 @@ import {
 } from '../lib';
 import { Button, Field, TextInput } from '../ui';
 
-type Identity = Pick<Submission, 'fullName' | 'phone' | 'notes'>;
+type Identity = Pick<Submission, 'fullName' | 'notes'>;
 
-const EMPTY: Identity = { fullName: '', phone: '', notes: '' };
+const EMPTY: Identity = { fullName: '', notes: '' };
 
 interface Props {
   measures: Record<MeasureKey, number>;
@@ -49,7 +49,7 @@ export default function CustomerForm({ measures, gender, onSaved, onError }: Pro
     e.preventDefault();
     const found = validateSubmission(full());
     setErrors(found);
-    setTouched({ fullName: true, phone: true });
+    setTouched({ fullName: true });
 
     if (Object.keys(found).length) {
       // ننقل التركيز لأول حقل خاطئ بدل عرض قائمة أخطاء في الأعلى
@@ -61,7 +61,6 @@ export default function CustomerForm({ measures, gender, onSaved, onError }: Pro
     try {
       await api.addSubmission({
         fullName: v.fullName.trim(),
-        phone: v.phone.trim(),
         notes: v.notes.trim(),
         gender,
         ...measures,
@@ -91,17 +90,6 @@ export default function CustomerForm({ measures, gender, onSaved, onError }: Pro
               onChange={(e) => set('fullName')(e.target.value)}
               onBlur={blur('fullName')}
               placeholder="محمد باقر حسن" autoComplete="name"
-            />
-          )}
-        </Field>
-
-        <Field label="رقم الهاتف" hint="اختياري" error={err('phone')}>
-          {(id, invalid) => (
-            <TextInput
-              id={id} invalid={invalid} value={v.phone}
-              onChange={(e) => set('phone')(e.target.value)}
-              onBlur={blur('phone')}
-              placeholder="07701234567" inputMode="tel" dir="ltr"
             />
           )}
         </Field>

@@ -24,7 +24,6 @@ export interface Submission {
   id: string;
   createdAt: number;
   fullName: string;
-  phone: string;
   gender: Gender;
   height: number;       // الطول (سم)
   weight: number;       // الوزن (كغم)
@@ -77,9 +76,9 @@ export const MEASURE_FIELDS: FieldDef[] = [
   { key: 'height',       label: 'الطول',      unit: 'سم',  min: 100, max: 220, step: 1,   hint: 'الطول الكلي واقفًا بدون حذاء' },
   { key: 'weight',       label: 'الوزن',      unit: 'كغم', min: 25,  max: 180, step: 0.5, hint: 'الوزن التقريبي بالكيلوغرام' },
   { key: 'width',        label: 'العرض',      unit: 'سم',  min: 25,  max: 80,  step: 0.5, hint: 'عرض الكتفين من طرف إلى طرف' },
-  { key: 'chestWidth',   label: 'عرض الصدر',  unit: 'سم',  min: 25,  max: 80,  step: 0.5, hint: 'أعرض نقطة في الصدر' },
-  { key: 'chestLength',  label: 'طول الصدر',  unit: 'سم',  min: 25,  max: 90,  step: 0.5, hint: 'من أعلى الكتف حتى الخصر' },
-  { key: 'sleeveLength', label: 'طول الكم',   unit: 'سم',  min: 20,  max: 90,  step: 0.5, hint: 'من الكتف حتى الرسغ' },
+  { key: 'chestWidth',   label: 'عرض الصدر',  unit: 'سم',  min: 25,  max: 80,  step: 0.5, hint: 'من إبط إلى إبط والقميص مسطّح' },
+  { key: 'chestLength',  label: 'طول الصدر',  unit: 'سم',  min: 25,  max: 90,  step: 0.5, hint: 'من أعلى الكتف حتى ذيل القميص' },
+  { key: 'sleeveLength', label: 'طول الكم',   unit: 'سم',  min: 20,  max: 90,  step: 0.5, hint: 'من طرف الكتف حتى حافّة الكم' },
 ];
 
 export const GENDER_LABEL: Record<Gender, string> = { male: 'ذكر', female: 'أنثى' };
@@ -128,7 +127,6 @@ export function validateSubmission(v: Partial<Submission>): FormErrors {
   const e: FormErrors = {};
 
   if (!v.fullName || v.fullName.trim().length < 3) e.fullName = 'اكتب الاسم الثلاثي (3 أحرف على الأقل)';
-  if (v.phone && !/^[0-9+\s-]{7,15}$/.test(v.phone.trim())) e.phone = 'رقم هاتف غير صالح';
   if (!v.gender) e.gender = 'اختر الجنس';
 
   for (const f of MEASURE_FIELDS) {
@@ -592,7 +590,6 @@ export const api = {
         id: uid(),
         createdAt: Date.now() - i * 36e5 * 7,
         fullName,
-        phone: `0770${Math.floor(1000000 + Math.random() * 8999999)}`,
         gender,
         height: Math.round(jitter(172 * base, 12)),
         weight: jitter(70 * base, 18),
@@ -656,7 +653,6 @@ const EXPORT_COLUMNS: { label: string; get: (s: Submission) => string }[] = [
     label: `${f.label} (${f.unit})`,
     get: (s: Submission) => String(s[f.key]),
   })),
-  { label: 'الهاتف', get: (s) => s.phone || '—' },
   { label: 'ملاحظات', get: (s) => s.notes || '—' },
 ];
 
