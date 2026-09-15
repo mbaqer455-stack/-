@@ -18,7 +18,6 @@ create table if not exists public.submissions (
   id             text primary key,
   "createdAt"    bigint      not null,
   "fullName"     text        not null,
-  phone          text        not null default '',
   gender         text        not null check (gender in ('male', 'female')),
   height         numeric     not null,
   weight         numeric     not null,
@@ -29,7 +28,7 @@ create table if not exists public.submissions (
   notes          text        not null default ''
 );
 
--- حقول أُزيلت من النموذج (الرقم الجامعي/المرحلة/الشعبة).
+-- حقول أُزيلت من النموذج (الرقم الجامعي/المرحلة/الشعبة/الهاتف).
 -- لا نحذف الأعمدة حتى لا تضيع بيانات قديمة — نُرخي قيد NOT NULL فقط
 -- كي تنجح الإضافات الجديدة على قاعدة أُنشئت قبل الإزالة.
 do $$
@@ -40,6 +39,14 @@ begin
   ) then
     execute 'alter table public.submissions alter column "studentId" drop not null';
     execute 'alter table public.submissions alter column "studentId" set default ''''';
+  end if;
+
+  if exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'submissions' and column_name = 'phone'
+  ) then
+    execute 'alter table public.submissions alter column phone drop not null';
+    execute 'alter table public.submissions alter column phone set default ''''';
   end if;
 end $$;
 

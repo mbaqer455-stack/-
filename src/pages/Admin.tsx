@@ -4,10 +4,10 @@
    سرّية: لا يوجد أي رابط يدلّ عليها في الموقع، والدخول برمز.
      • الوضع المحلي  : رمز واحد (الافتراضي 1234، يُغيَّر من تبويب الإعدادات)
      • الوضع السحابي : بريد وكلمة مرور لحساب Supabase حقيقي،
-                       وسياسات RLS ترفض قراءة بيانات الطلاب بدون تسجيل دخول
+                       وسياسات RLS ترفض قراءة بيانات الزبائن بدون تسجيل دخول
                        حتى لو تجاوز أحدهم الواجهة.
 
-   ثلاثة تبويبات: بيانات الطلاب · الفيديوهات · الإعدادات.
+   ثلاثة تبويبات: بيانات الزبائن · الفيديوهات · الإعدادات.
    ========================================================================== */
 
 import { useMemo, useState } from 'react';
@@ -177,7 +177,7 @@ function Gate({ session }: { session: ReturnType<typeof useAdminSession> }) {
 /* =============================== اللوحة ================================= */
 
 const TABS: { key: Tab; label: string; icon: 'users' | 'video' | 'grid' }[] = [
-  { key: 'data', label: 'بيانات الطلاب', icon: 'users' },
+  { key: 'data', label: 'بيانات الزبائن', icon: 'users' },
   { key: 'videos', label: 'الفيديوهات', icon: 'video' },
   { key: 'settings', label: 'الإعدادات', icon: 'grid' },
 ];
@@ -235,7 +235,7 @@ function Panel({ session }: { session: ReturnType<typeof useAdminSession> }) {
 
 type Push = (text: string, tone?: 'ok' | 'error' | 'info') => void;
 
-/* ---------------------------- بيانات الطلاب ---------------------------- */
+/* ---------------------------- بيانات الزبائن ---------------------------- */
 
 function DataTab({ push }: { push: Push }) {
   const rows = useSubmissions();
@@ -247,7 +247,7 @@ function DataTab({ push }: { push: Push }) {
     const needle = q.trim().toLowerCase();
     if (!needle) return rows;
     return rows.filter((r) =>
-      [r.fullName, r.phone].join(' ').toLowerCase().includes(needle));
+      r.fullName.toLowerCase().includes(needle));
   }, [rows, q]);
 
   const remove = (r: Submission) => {
@@ -276,7 +276,7 @@ function DataTab({ push }: { push: Push }) {
           <TextInput
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            placeholder="ابحث بالاسم أو الهاتف…"
+            placeholder="ابحث بالاسم…"
             className="pr-10"
           />
           <Icons.search className="pointer-events-none absolute right-3.5 top-1/2 size-4 -translate-y-1/2 text-ink-faint" />
@@ -301,40 +301,33 @@ function DataTab({ push }: { push: Push }) {
           <table className="w-full min-w-200 text-sm">
             <thead className="border-b border-line text-xs text-ink-faint">
               <tr>
-                {['التاريخ', 'الاسم', 'الهاتف', 'الجنس', 'المقاس',
+                {['التاريخ', 'الاسم', 'الجنس',
                   ...MEASURE_FIELDS.map((f) => f.label), ''].map((h, i) => (
                   <th key={i} className="whitespace-nowrap px-3 py-3 text-start font-medium">{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
-              {filtered.map((r) => {
-                const sized = computeSize(r);
-                return (
-                  <tr key={r.id} className="border-b border-line-soft last:border-0 hover:bg-surface-2/60">
-                    <td className="tabular whitespace-nowrap px-3 py-2.5 text-ink-faint">{formatDate(r.createdAt)}</td>
-                    <td className="whitespace-nowrap px-3 py-2.5 font-medium text-ink">{r.fullName}</td>
-                    <td className="tabular whitespace-nowrap px-3 py-2.5">{r.phone || '—'}</td>
-                    <td className="whitespace-nowrap px-3 py-2.5">{GENDER_LABEL[r.gender]}</td>
-                    <td className="whitespace-nowrap px-3 py-2.5">
-                      <Badge tone={sized.outOfRange ? 'rose' : 'brand'}>{sized.size}</Badge>
-                    </td>
-                    {MEASURE_FIELDS.map((f) => (
-                      <td key={f.key} className="tabular whitespace-nowrap px-3 py-2.5">{r[f.key]}</td>
-                    ))}
-                    <td className="px-3 py-2.5">
-                      <button
-                        onClick={() => remove(r)}
-                        aria-label={`حذف قياس ${r.fullName}`}
-                        className="grid size-8 cursor-pointer place-items-center rounded-lg text-ink-faint
-                                   transition-colors hover:bg-rose/10 hover:text-rose"
-                      >
-                        <Icons.trash className="size-4" />
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })}
+              {filtered.map((r) => (
+                <tr key={r.id} className="border-b border-line-soft last:border-0 hover:bg-surface-2/60">
+                  <td className="tabular whitespace-nowrap px-3 py-2.5 text-ink-faint">{formatDate(r.createdAt)}</td>
+                  <td className="whitespace-nowrap px-3 py-2.5 font-medium text-ink">{r.fullName}</td>
+                  <td className="whitespace-nowrap px-3 py-2.5">{GENDER_LABEL[r.gender]}</td>
+                  {MEASURE_FIELDS.map((f) => (
+                    <td key={f.key} className="tabular whitespace-nowrap px-3 py-2.5">{r[f.key]}</td>
+                  ))}
+                  <td className="px-3 py-2.5">
+                    <button
+                      onClick={() => remove(r)}
+                      aria-label={`حذف قياس ${r.fullName}`}
+                      className="grid size-8 cursor-pointer place-items-center rounded-lg text-ink-faint
+                                 transition-colors hover:bg-rose/10 hover:text-rose"
+                    >
+                      <Icons.trash className="size-4" />
+                    </button>
+                  </td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>
@@ -395,19 +388,18 @@ function SizesSummary({ rows }: { rows: Submission[] }) {
 function PrintSheet({ rows }: { rows: Submission[] }) {
   return (
     <div className="print-root" aria-hidden="true">
-      <h1 style={{ textAlign: 'center', marginBottom: 12 }}>قياسات الطلاب</h1>
+      <h1 style={{ textAlign: 'center', marginBottom: 12 }}>قياسات الزبائن</h1>
       <table>
         <thead>
           <tr>
-            <th>الاسم</th><th>الهاتف</th><th>الجنس</th><th>المقاس</th>
+            <th>الاسم</th><th>الجنس</th>
             {MEASURE_FIELDS.map((f) => <th key={f.key}>{f.label}</th>)}
           </tr>
         </thead>
         <tbody>
           {rows.map((r) => (
             <tr key={r.id}>
-              <td>{r.fullName}</td><td>{r.phone}</td><td>{GENDER_LABEL[r.gender]}</td>
-              <td>{computeSize(r).size}</td>
+              <td>{r.fullName}</td><td>{GENDER_LABEL[r.gender]}</td>
               {MEASURE_FIELDS.map((f) => <td key={f.key}>{r[f.key]}</td>)}
             </tr>
           ))}

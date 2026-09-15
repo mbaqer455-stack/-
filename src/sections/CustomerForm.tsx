@@ -1,7 +1,7 @@
 /* ============================================================================
-   بيانات الطالب + زر الحفظ
+   بيانات الزبون + زر الحفظ
 
-   يأخذ اسم الطالب، ويحفظه مع القياسات الحالية والجنس.
+   يأخذ اسم الزبون وملاحظته، ويحفظهما مع القياسات الحالية والجنس.
    التحقق يعمل عند مغادرة الحقل (onBlur) لا عند الضغط فقط — الخطأ يظهر تحت
    الحقل نفسه، وعند الإرسال يُنقل التركيز لأول حقل خاطئ.
    ========================================================================== */
@@ -11,11 +11,11 @@ import {
   api, validateSubmission,
   type FormErrors, type Gender, type MeasureKey, type Submission,
 } from '../lib';
-import { Button, Field, TextInput } from '../ui';
+import { Button, Checkbox, Field, TextInput } from '../ui';
 
-type Identity = Pick<Submission, 'fullName' | 'phone' | 'notes'>;
+type Identity = Pick<Submission, 'fullName' | 'notes'>;
 
-const EMPTY: Identity = { fullName: '', phone: '', notes: '' };
+const EMPTY: Identity = { fullName: '', notes: '' };
 
 interface Props {
   measures: Record<MeasureKey, number>;
@@ -24,11 +24,13 @@ interface Props {
   onError: (message: string) => void;
 }
 
-export default function StudentForm({ measures, gender, onSaved, onError }: Props) {
+export default function CustomerForm({ measures, gender, onSaved, onError }: Props) {
   const [v, setV] = useState<Identity>(EMPTY);
   const [errors, setErrors] = useState<FormErrors>({});
   const [touched, setTouched] = useState<Partial<Record<keyof Identity, boolean>>>({});
   const [saving, setSaving] = useState(false);
+  // إقرار الزبون بأن القياسات صحيحة — الزر مقفل حتى يؤشّره
+  const [confirmed, setConfirmed] = useState(false);
   const formRef = useRef<HTMLFormElement>(null);
 
   const full = (): Partial<Submission> => ({ ...v, ...measures, gender });
@@ -36,7 +38,7 @@ export default function StudentForm({ measures, gender, onSaved, onError }: Prop
   const set = (key: keyof Identity) => (value: string) => {
     const next = { ...v, [key]: value };
     setV(next);
-    // بعد أول خطأ نصحّح أثناء الكتابة حتى يرى الطالب الخطأ يختفي
+    // بعد أول خطأ نصحّح أثناء الكتابة حتى يرى الزبون الخطأ يختفي
     if (touched[key]) setErrors(validateSubmission({ ...full(), ...next }));
   };
 
@@ -47,9 +49,11 @@ export default function StudentForm({ measures, gender, onSaved, onError }: Prop
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!confirmed) return;
+
     const found = validateSubmission(full());
     setErrors(found);
-    setTouched({ fullName: true, phone: true });
+    setTouched({ fullName: true });
 
     if (Object.keys(found).length) {
       // ننقل التركيز لأول حقل خاطئ بدل عرض قائمة أخطاء في الأعلى
@@ -61,7 +65,6 @@ export default function StudentForm({ measures, gender, onSaved, onError }: Prop
     try {
       await api.addSubmission({
         fullName: v.fullName.trim(),
-        phone: v.phone.trim(),
         notes: v.notes.trim(),
         gender,
         ...measures,
@@ -70,6 +73,7 @@ export default function StudentForm({ measures, gender, onSaved, onError }: Prop
       setV(EMPTY);
       setErrors({});
       setTouched({});
+      setConfirmed(false); // الزبون التالي يؤكّد قياسه بنفسه
     } catch (err) {
       onError(err instanceof Error ? err.message : 'تعذّر حفظ القياس');
     } finally {
@@ -81,7 +85,7 @@ export default function StudentForm({ measures, gender, onSaved, onError }: Prop
 
   return (
     <form ref={formRef} onSubmit={submit} noValidate className="card flex flex-col gap-5 p-5 sm:p-6">
-      <h2 className="text-lg">بيانات الطالب</h2>
+      <h2 className="text-lg">بيانات الزبون</h2>
 
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label="الاسم الثلاثي" required error={err('fullName')}>
@@ -91,17 +95,6 @@ export default function StudentForm({ measures, gender, onSaved, onError }: Prop
               onChange={(e) => set('fullName')(e.target.value)}
               onBlur={blur('fullName')}
               placeholder="محمد باقر حسن" autoComplete="name"
-            />
-          )}
-        </Field>
-
-        <Field label="رقم الهاتف" hint="اختياري" error={err('phone')}>
-          {(id, invalid) => (
-            <TextInput
-              id={id} invalid={invalid} value={v.phone}
-              onChange={(e) => set('phone')(e.target.value)}
-              onBlur={blur('phone')}
-              placeholder="07701234567" inputMode="tel" dir="ltr"
             />
           )}
         </Field>
@@ -117,9 +110,20 @@ export default function StudentForm({ measures, gender, onSaved, onError }: Prop
         </Field>
       </div>
 
-      <Button type="submit" size="lg" icon="check" loading={saving} className="w-full sm:w-auto sm:self-start">
-        {saving ? 'جارٍ الحفظ…' : 'حفظ القياس'}
-      </Button>
+      <div className="flex flex-col gap-4">
+        <Checkbox
+          checked={confirmed}
+          onChange={setConfirmed}
+          label="هل أنت متأكد من القياس؟"
+        />
+
+        <Button
+          type="submit" size="lg" icon="check" loading={saving} disabled={!confirmed}
+          className="w-full sm:w-auto sm:self-start"
+        >
+          {saving ? 'جارٍ الحفظ…' : 'حفظ القياس'}
+        </Button>
+      </div>
     </form>
   );
 }

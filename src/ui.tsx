@@ -123,23 +123,21 @@ type Variant = 'primary' | 'outline' | 'ghost' | 'danger';
 type Size = 'sm' | 'md' | 'lg';
 
 const VARIANTS: Record<Variant, string> = {
+  // هيئة حبّة ذكر/أنثى + امتلاء أبيض بطيء بالمرور (انظر .btn-primary في index.css)
   primary:
-    'relative liquid liquid-sheen font-semibold text-on-brand border border-white/25 ' +
-    'bg-gradient-to-b from-brand-vivid to-brand ' +
-    'shadow-[inset_0_1px_0_0_rgb(255_255_255/0.35),0_10px_26px_-10px_rgb(10_10_11/0.4)] ' +
-    'hover:shadow-[inset_0_1px_0_0_rgb(255_255_255/0.5),0_14px_32px_-10px_rgb(10_10_11/0.5)]',
+    'btn-primary font-semibold',
   outline:
-    'relative liquid liquid-sheen glass text-ink hover:border-brand-soft',
+    'border border-line bg-surface text-ink transition-colors duration-150 hover:bg-white hover:border-brand-soft',
   ghost:
-    'liquid text-ink-dim hover:text-brand hover:bg-brand-tint/70',
+    'text-ink-dim transition-colors duration-150 hover:text-ink hover:bg-surface-2',
   danger:
-    'liquid border border-rose/25 bg-rose/8 text-rose hover:bg-rose/15 backdrop-blur-md',
+    'border border-rose/25 bg-rose/8 text-rose transition-colors duration-150 hover:bg-rose/15',
 };
 
 const SIZES: Record<Size, string> = {
-  sm: 'h-9 px-3.5 text-[13px] gap-1.5 rounded-lg',
-  md: 'h-11 px-5 text-sm gap-2 rounded-xl',
-  lg: 'h-13 px-7 text-base gap-2.5 rounded-xl',
+  sm: 'h-9 px-4 text-[13px] gap-1.5 rounded-pill',
+  md: 'h-11 px-5.5 text-sm gap-2 rounded-pill',
+  lg: 'h-13 px-7 text-base gap-2.5 rounded-pill',
 };
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
@@ -156,7 +154,6 @@ export function Button({
   return (
     <button
       className={`inline-flex cursor-pointer select-none items-center justify-center whitespace-nowrap
-        transition-[transform,background-color,border-color,color,box-shadow] duration-200
         disabled:pointer-events-none disabled:opacity-50
         ${VARIANTS[variant]} ${SIZES[size]} ${className}`}
       disabled={disabled || loading}
@@ -338,6 +335,50 @@ export function Switch({ checked, onChange, label, description }: SwitchProps) {
         {description && <span className="block text-[13px] leading-snug text-ink-faint">{description}</span>}
       </span>
     </button>
+  );
+}
+
+/* ----------------------------- مربّع الاختيار ---------------------------- */
+
+interface CheckboxProps {
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+  label: ReactNode;
+}
+
+/**
+ * المربّع الحقيقي مخفيّ لا محذوف (sr-only)، فيبقى للوحة المفاتيح وقارئ الشاشة
+ * سلوكهما الطبيعي، ويُرسم مربّعٌ بديل يتبع حالته عبر peer-checked.
+ */
+export function Checkbox({ checked, onChange, label }: CheckboxProps) {
+  const id = useId();
+  return (
+    <label
+      htmlFor={id}
+      className="flex w-fit cursor-pointer select-none items-center gap-2.5 text-sm text-ink"
+    >
+      <input
+        id={id}
+        type="checkbox"
+        checked={checked}
+        onChange={(e) => onChange(e.target.checked)}
+        className="peer sr-only"
+      />
+      <span
+        aria-hidden="true"
+        className="grid size-5 shrink-0 place-items-center rounded-md border border-line bg-surface-2
+                   text-transparent transition-colors duration-200
+                   peer-hover:border-brand-soft
+                   peer-checked:border-brand peer-checked:bg-brand peer-checked:text-on-brand
+                   peer-focus-visible:ring-2 peer-focus-visible:ring-brand/25"
+      >
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.2"
+             strokeLinecap="round" strokeLinejoin="round" className="size-3">
+          <path d="M4.5 12.5l5 5 10-11" />
+        </svg>
+      </span>
+      {label}
+    </label>
   );
 }
 
