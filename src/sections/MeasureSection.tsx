@@ -115,11 +115,11 @@ function SizePicker({
     <div className="flex flex-col gap-2">
       <span id="size-label" className="text-sm font-medium text-ink">مقاس جاهز</span>
 
-      {/* على الهاتف شبكة ٣×٢ لا صفّ يلتفّ ٥+١ */}
+      {/* على الهاتف ثلاثة في الصف: ٣ + ٢ بدل صفّ واحد مزدحم */}
       <div
         role="radiogroup"
         aria-labelledby="size-label"
-        className="grid grid-cols-4 gap-2 sm:flex sm:flex-wrap"
+        className="grid grid-cols-3 gap-2 sm:flex sm:flex-wrap"
       >
         {presets.map((p) => {
           const on = active === p.name;

@@ -9,6 +9,9 @@
    أي قياس خارج الجدول (جسم صغير جدًا أو كبير جدًا) يُقرَّب لأقرب مقاس
    ويُعلَّم "outOfRange" حتى يعرف المصنع أنه يحتاج تفصيلًا خاصًا لا مقاسًا جاهزًا.
 
+   الجدول من S إلى XXL. ما تحته أو فوقه يُقرَّب لأقرب طرف ويُعلَّم outOfRange،
+   فيراه المشرف في لوحة التحكّم ويعرف أنه يحتاج تفصيلًا خاصًا.
+
    والاتجاه المعاكس هنا أيضًا: أزرار المقاس الجاهزة في صفحة القياس تُولَّد من
    CHART نفسه (انظر SIZE_PRESETS أدناه)، فلا يمكن أن يختار الزبون «XXL» ثم
    تكتب ورقة المصنع «XL» — الجدول واحد والاتجاهان ينامان عليه.
@@ -16,31 +19,27 @@
 
 import type { Gender, MeasureKey, Submission } from './lib';
 
-export type SizeLabel = 'XS' | 'S' | 'M' | 'L' | 'XL' | 'XXL' | 'XXXL';
+export type SizeLabel = 'S' | 'M' | 'L' | 'XL' | 'XXL';
 
-export const SIZE_ORDER: SizeLabel[] = ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL'];
+export const SIZE_ORDER: SizeLabel[] = ['S', 'M', 'L', 'XL', 'XXL'];
 
 interface SizeBracket { max: number; label: SizeLabel }
 
 /** الحد الأعلى لمحيط الصدر (سم) لكل مقاس — جدول قمصان بالغين عالمي معتمد */
 const CHART: Record<Gender, SizeBracket[]> = {
   male: [
-    { max: 86, label: 'XS' },
     { max: 94, label: 'S' },
     { max: 102, label: 'M' },
     { max: 110, label: 'L' },
     { max: 118, label: 'XL' },
     { max: 126, label: 'XXL' },
-    { max: 134, label: 'XXXL' },
   ],
   female: [
-    { max: 82, label: 'XS' },
     { max: 88, label: 'S' },
     { max: 94, label: 'M' },
     { max: 102, label: 'L' },
     { max: 110, label: 'XL' },
     { max: 118, label: 'XXL' },
-    { max: 126, label: 'XXXL' },
   ],
 };
 
@@ -78,6 +77,7 @@ export interface SizePreset {
   name: SizeLabel;
   measures: Record<GarmentKey, number>;
 }
+
 
 /**
  * قياس القميص الأساسي للمشغل — يطابق DEFAULT_MEASURES في lib.ts.
