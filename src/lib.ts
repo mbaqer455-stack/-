@@ -16,7 +16,11 @@ import { isCloud, MEDIA_BUCKET, must, supabase } from './supabase';
 import { computeSize, SIZE_ORDER, summarizeSizes } from './sizing';
 
 export { isCloud };
-export { computeSize, formatSizeSummary, SIZE_ORDER, summarizeSizes, type SizeCount, type SizeLabel, type SizeResult } from './sizing';
+export {
+  computeSize, formatSizeSummary, GARMENT_KEYS, matchPreset, SIZE_ORDER, SIZE_PRESETS,
+  summarizeSizes,
+  type GarmentKey, type SizeCount, type SizeLabel, type SizePreset, type SizeResult,
+} from './sizing';
 
 /* ----------------------------------- الأنواع ---------------------------- */
 
@@ -84,7 +88,6 @@ export const MEASURE_FIELDS: FieldDef[] = [
 ];
 
 export const GENDER_LABEL: Record<Gender, string> = { male: 'ذكر', female: 'أنثى' };
-
 
 export const DEFAULT_MEASURES: Record<MeasureKey, number> = {
   height: 178, weight: 49, width: 55.5, chestWidth: 51.5, chestLength: 65, sleeveLength: 58,

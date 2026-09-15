@@ -8,9 +8,13 @@
 
    أي قياس خارج الجدول (جسم صغير جدًا أو كبير جدًا) يُقرَّب لأقرب مقاس
    ويُعلَّم "outOfRange" حتى يعرف المصنع أنه يحتاج تفصيلًا خاصًا لا مقاسًا جاهزًا.
+
+   والاتجاه المعاكس هنا أيضًا: أزرار المقاس الجاهزة في صفحة القياس تُولَّد من
+   CHART نفسه (انظر SIZE_PRESETS أدناه)، فلا يمكن أن يختار الزبون «XXL» ثم
+   تكتب ورقة المصنع «XL» — الجدول واحد والاتجاهان ينامان عليه.
    ========================================================================== */
 
-import type { Gender, Submission } from './lib';
+import type { Gender, MeasureKey, Submission } from './lib';
 
 export type SizeLabel = 'XS' | 'S' | 'M' | 'L' | 'XL' | 'XXL' | 'XXXL';
 
@@ -61,6 +65,67 @@ export function computeSize(s: Pick<Submission, 'chestWidth' | 'gender'>): SizeR
     outOfRange: chest < MIN_CHEST || !bracket,
   };
 }
+
+
+/* --------------------------- المقاسات الجاهزة للإدخال -------------------- */
+
+/** ما يخصّ القميص نفسه. الطول والوزن صفتا الزبون، فلا يمسّهما اختيار المقاس. */
+export type GarmentKey = 'width' | 'chestWidth' | 'chestLength' | 'sleeveLength';
+
+export const GARMENT_KEYS: GarmentKey[] = ['width', 'chestWidth', 'chestLength', 'sleeveLength'];
+
+export interface SizePreset {
+  name: SizeLabel;
+  measures: Record<GarmentKey, number>;
+}
+
+/**
+ * قياس القميص الأساسي للمشغل — يطابق DEFAULT_MEASURES في lib.ts.
+ * (لا نستورده من هناك: lib.ts يستورد من هذا الملف، والاستيراد المتبادل
+ * لقيمة — لا لنوع — يوقعنا في حلقة.)
+ */
+const BASE = { chestWidth: 51.5, width: 55.5, chestLength: 65, sleeveLength: 58 };
+
+/** تدرّج المشغل لكل سنتيمتر من عرض الصدر */
+const GRADE = { width: 0.6, chestLength: 0.8, sleeveLength: 0.6 };
+
+const half = (v: number): number => Math.round(v * 2) / 2;
+
+/**
+ * عرض الصدر الممثّل لكل مقاس: منتصف شريحته في CHART مقسومًا على ٢. المنتصف
+ * يقع داخل الشريحة دائمًا، فـ computeSize تُرجع المقاس نفسه — وهذا ما يضمن
+ * أن الاتجاهين لا يتعارضان. الشريحة الأولى لا حدّ أدنى لها فنعطيها خطوة
+ * الشريحة التي تليها.
+ */
+function presetsFor(gender: Gender): SizePreset[] {
+  const chart = CHART[gender];
+  return chart.map((b, i) => {
+    const low = i === 0 ? b.max - (chart[1].max - b.max) : chart[i - 1].max;
+    const chestWidth = half((low + b.max) / 4); // ((low+max)/2) محيطًا ÷ ٢ مسطّحًا
+    const d = chestWidth - BASE.chestWidth;
+    return {
+      name: b.label,
+      measures: {
+        chestWidth,
+        width: half(BASE.width + d * GRADE.width),
+        chestLength: half(BASE.chestLength + d * GRADE.chestLength),
+        sleeveLength: half(BASE.sleeveLength + d * GRADE.sleeveLength),
+      },
+    };
+  });
+}
+
+export const SIZE_PRESETS: Record<Gender, SizePreset[]> = {
+  male: presetsFor('male'),
+  female: presetsFor('female'),
+};
+
+/** المقاس الذي تطابقه القياسات الحالية تمامًا، أو null إن عدّلها الزبون بنفسه */
+export const matchPreset = (
+  gender: Gender,
+  m: Record<MeasureKey, number>,
+): SizeLabel | null =>
+  SIZE_PRESETS[gender].find((p) => GARMENT_KEYS.every((k) => p.measures[k] === m[k]))?.name ?? null;
 
 export interface SizeCount { size: SizeLabel; count: number }
 

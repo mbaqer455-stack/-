@@ -7,16 +7,16 @@
      │   [ سلايدر ]        [ سلايدر ]            │
      │   [ سلايدر ]        [ سلايدر ]            │
      │   ───────────────────────────             │
-     │   [ ذكر ] [ أنثى ]                        │
+     │   [ ذكر ] [ أنثى ]      [S][M][L][XL]…    │
      └──────────────────────────────────────────┘
-   السلايدرات في عمودين على الشاشة الواسعة وعمود واحد على الهاتف،
-   وتحتها أزرار الجنس، ثم نموذج بيانات الزبون والحفظ.
+   السلايدرات في عمودين على الشاشة الواسعة وعمود واحد على الهاتف، وتحتها
+   أزرار الجنس يمينًا والمقاسات الجاهزة يسارًا، ثم بيانات الزبون والحفظ.
    ========================================================================== */
 
 import { useState } from 'react';
 import {
-  DEFAULT_MEASURES, GENDER_LABEL, MEASURE_FIELDS, useToasts,
-  type Gender, type MeasureKey,
+  DEFAULT_MEASURES, GENDER_LABEL, MEASURE_FIELDS, SIZE_PRESETS, matchPreset, useToasts,
+  type Gender, type MeasureKey, type SizePreset,
 } from '../lib';
 import { LiquidSegment, LiquidSlider } from '../liquid';
 import { Icons, Toasts } from '../ui';
@@ -59,16 +59,27 @@ export default function MeasureSection() {
 
         <div className="divider-x" aria-hidden="true" />
 
-        {/* خياران اثنان لا يستحقّان عرض البطاقة كاملًا */}
-        <div className="w-full sm:max-w-sm">
-          <LiquidSegment
-            legend="الجنس"
-            value={gender}
-            onChange={setGender}
-            options={[
-              { value: 'male' as Gender, label: GENDER_LABEL.male },
-              { value: 'female' as Gender, label: GENDER_LABEL.female },
-            ]}
+        <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between sm:gap-8">
+          {/* خياران اثنان لا يستحقّان عرض البطاقة كاملًا.
+              العنوان مرئيّ ليحاذي عنوان المقاسات — و aria-hidden لأن
+              <legend> داخل LiquidSegment يقوله لقارئ الشاشة أصلًا. */}
+          <div className="flex w-full flex-col gap-2 sm:max-w-xs">
+            <span aria-hidden="true" className="text-sm font-medium text-ink">الجنس</span>
+            <LiquidSegment
+              legend="الجنس"
+              value={gender}
+              onChange={setGender}
+              options={[
+                { value: 'male' as Gender, label: GENDER_LABEL.male },
+                { value: 'female' as Gender, label: GENDER_LABEL.female },
+              ]}
+            />
+          </div>
+
+          <SizePicker
+            presets={SIZE_PRESETS[gender]}
+            active={matchPreset(gender, measures)}
+            onPick={(p) => setMeasures((m) => ({ ...m, ...p.measures }))}
           />
         </div>
       </div>
@@ -85,5 +96,53 @@ export default function MeasureSection() {
 
       <Toasts items={toasts} />
     </section>
+  );
+}
+
+/* ---------------------------- المقاسات الجاهزة -------------------------- */
+
+/**
+ * يملأ قياسات القميص دفعةً واحدة. لا يمسّ الطول والوزن لأنهما صفتا الزبون
+ * لا صفتا القميص — فاختيار XL لا يغيّر طول من يلبسه.
+ * المقاس المُبرَز محسوب من القياسات نفسها، فأي تحريك لشريط يُلغي الإبراز
+ * تلقائيًا ويصير القياس مخصّصًا بلا حالة إضافية نتابعها.
+ * والجداول تختلف بين ذكر وأنثى، فالأزرار تتبع الجنس المختار.
+ */
+function SizePicker({
+  presets, active, onPick,
+}: { presets: SizePreset[]; active: string | null; onPick: (p: SizePreset) => void }) {
+  return (
+    <div className="flex flex-col gap-2">
+      <span id="size-label" className="text-sm font-medium text-ink">مقاس جاهز</span>
+
+      {/* على الهاتف شبكة ٣×٢ لا صفّ يلتفّ ٥+١ */}
+      <div
+        role="radiogroup"
+        aria-labelledby="size-label"
+        className="grid grid-cols-4 gap-2 sm:flex sm:flex-wrap"
+      >
+        {presets.map((p) => {
+          const on = active === p.name;
+          return (
+            <button
+              key={p.name}
+              type="button"
+              role="radio"
+              aria-checked={on}
+              onClick={() => onPick(p)}
+              className={`tabular h-9 min-w-12 cursor-pointer rounded-pill border px-3 text-[13px] font-semibold
+                transition-colors duration-200
+                ${on
+                  ? 'border-brand bg-brand text-on-brand'
+                  : 'border-line bg-surface text-ink-dim hover:border-brand-soft hover:text-ink'}`}
+            >
+              {p.name}
+            </button>
+          );
+        })}
+      </div>
+
+      <span className="text-[13px] text-ink-faint">يضبط قياسات القميص — الطول والوزن تبقى كما هي</span>
+    </div>
   );
 }
